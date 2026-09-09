@@ -20,7 +20,6 @@ import type { ChartRow, FleetSeries } from "@/lib/fleet";
 
 const DAY = 86_400_000;
 
-/** Marker radii, px. Carried marks are larger to survive being hollow. */
 const DOT_LIVE = 2.4;
 const DOT_CARRIED = 3.2;
 
@@ -29,10 +28,6 @@ const chartConfig = {
   equalWeighted: { label: "equal-wtd", color: "var(--chart-ew)" },
 } satisfies ChartConfig;
 
-/**
- * Tick format chosen from the visible span, so density stays readable whether
- * the range is a fortnight or three years.
- */
 function tickFormatter(span: number) {
   const options: Intl.DateTimeFormatOptions =
     span > 730 * DAY
@@ -44,11 +39,6 @@ function tickFormatter(span: number) {
   return (t: number) => new Date(t).toLocaleDateString("en-US", options);
 }
 
-/**
- * Round a maximum up to a round number that divides into `ticks` readable
- * steps. Recharts' own choice for this data lands on 0.9% increments, which
- * nobody reads at a glance.
- */
 function niceMax(value: number, ticks = 4): number {
   if (value <= 0) return 1;
   const raw = value / ticks;
@@ -69,12 +59,6 @@ const fullDate = (t: number) =>
 const percent = (v: number) =>
   `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}%`;
 
-/**
- * Marker for a single mark (§6.3).
- *
- * Carried marks render hollow — noticeable on inspection, invisible when
- * scanning. A color would be too loud for something this common.
- */
 function MarkDot({
   cx,
   cy,
@@ -106,18 +90,6 @@ const AXIS_TICK = {
   fontFamily: "var(--font-numeric)",
 } as const;
 
-/**
- * The platform equity chart (§6.6).
- *
- * Sparse data is the steady state — 24 marks, not two years of daily bars.
- * Two things follow, and both are load-bearing:
- *
- *  - The x axis is real time (`type="number"`, `scale="time"`), never a
- *    category axis. A category axis spaces points evenly, which would close up
- *    every weekend and quietly assert the market traded through it.
- *  - `type="linear"` on both series. A spline through 24 points invents motion
- *    between them that the data does not support.
- */
 export function FleetChart({ series }: { series: FleetSeries }) {
   const span = Date.parse(series.to) - Date.parse(series.from);
   const formatTick = tickFormatter(span);
@@ -151,8 +123,6 @@ export function FleetChart({ series }: { series: FleetSeries }) {
           scale="time"
           domain={["dataMin", "dataMax"]}
           tickFormatter={formatTick}
-          // Recharts drops ticks that would crowd below this gap, which is what
-          // makes density adapt to the zoom level rather than to point count.
           minTickGap={44}
           tickLine={false}
           axisLine={{ stroke: "var(--hair)" }}
@@ -163,8 +133,6 @@ export function FleetChart({ series }: { series: FleetSeries }) {
           tickFormatter={(v: number) =>
             `${Number.isInteger(v) ? v : v.toFixed(1)}%`
           }
-          // Zero is forced into the domain so the reference line is always on
-          // the plot, even in a range that never crosses it.
           domain={[(min: number) => Math.min(0, min), (max: number) => niceMax(max)]}
           tickCount={5}
           width={48}
@@ -211,8 +179,6 @@ export function FleetChart({ series }: { series: FleetSeries }) {
           }
         />
 
-        {/* Equal-weighted is drawn first so it sits under the capital-weighted
-            line: it is the reference, not the result (§2.7). */}
         <Line
           dataKey="equalWeighted"
           type="linear"

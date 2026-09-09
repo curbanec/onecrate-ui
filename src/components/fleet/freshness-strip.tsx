@@ -1,13 +1,6 @@
 import { Figure, Label, Note, StatusDot } from "@/components/primitives";
 import type { CarriedMarks } from "@/lib/fleet";
 
-/**
- * The freshness strip (§6.4) — a small raised instrument block reporting only
- * facts the data actually supports.
- *
- * Note what is absent: no reconciliation readout. Drift is a banner (§6.5),
- * and putting a quiet "all reconciled" line here would undercut it.
- */
 export function FreshnessStrip({
   asOf,
   carried,
@@ -15,11 +8,6 @@ export function FreshnessStrip({
 }: {
   asOf: string | null
   carried: CarriedMarks;
-  /**
-   * Data has not updated when it should have. Defaults to "no timestamp at
-   * all", which is at least as untrustworthy as an old one. A real staleness
-   * window needs an expected-update interval the data does not yet carry.
-   */
   stale?: boolean;
 }) {
   const isStale = stale ?? asOf === null;

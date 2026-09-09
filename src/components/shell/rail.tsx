@@ -4,10 +4,8 @@ import { EnvToggle } from "./env-toggle";
 import { HairlineCross } from "./hairline-cross";
 import { RailNav } from "./rail-nav";
 
-/** Rail padding, px. The cross bleeds past it to reach the rail edges. */
 const RAIL_PADDING = 16;
 
-/** Left nav rail (§5.1) — `rail` surface, one step deeper than `panel`. */
 export function Rail({
   active,
   crossConfig,

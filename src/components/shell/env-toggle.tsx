@@ -5,13 +5,6 @@ import { cn } from "@/lib/utils";
 
 export type Env = "prod" | "dev";
 
-/**
- * PROD/DEV switch in the rail header.
- *
- * PROD active is the solid accent — it is the state that matters, so it is the
- * one that carries weight. DEV active is the quiet accent surface, because a
- * dev session should look unmistakably different without shouting.
- */
 export function EnvToggle({
   value,
   onChange,

@@ -1,10 +1,3 @@
-/**
- * Legend for the platform chart.
- *
- * Each swatch reproduces the treatment it stands for — weight and dash
- * pattern, not just color — because §2.7's two series are distinguished by
- * those as well, so the distinction survives desaturation and printing.
- */
 export function ChartLegend() {
   return (
     <div className="text-note text-muted flex flex-none gap-[14px]">

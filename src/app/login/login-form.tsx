@@ -12,11 +12,6 @@ const field = cn(
   "focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/40",
 );
 
-/**
- * The credential form. A Client Component only because it needs `useActionState`
- * to surface validation errors — the credential check itself stays on the server
- * in the action.
- */
 export function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<LoginState | undefined, FormData>(
     login,
@@ -58,7 +53,6 @@ export function LoginForm({ next }: { next: string }) {
         )}
       </div>
 
-      {/* Sits above the button so it is not missed, and is announced on change. */}
       {state?.message && (
         <p role="alert" className="text-note text-loss">
           {state.message}

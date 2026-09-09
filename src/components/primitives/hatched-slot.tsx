@@ -1,19 +1,11 @@
 import { cn } from "@/lib/utils";
 
-/**
- * A structural placeholder awaiting a real endpoint (§6.7).
- *
- * Hatched rather than blank, and always labeled with what belongs there, so a
- * region with no data yet can never be mistaken for a region whose data is
- * legitimately empty.
- */
 export function HatchedSlot({
   children,
   variant = "inline",
   className,
 }: {
   children: React.ReactNode;
-  /** `inline` sits in the row spine; `block` fills an expanded-card cell. */
   variant?: "inline" | "block";
   className?: string;
 }) {

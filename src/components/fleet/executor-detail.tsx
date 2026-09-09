@@ -1,13 +1,6 @@
 import { Figure, HatchedSlot, Label, Note } from "@/components/primitives";
 import { derivedNote, withhold, type Executor } from "@/lib/fleet";
 
-/**
- * Expanded card body (§5.5), on the `highlight` tint.
- *
- * The win rate is the doc's worked example of evidence quality: at n=12 it is
- * withheld outright rather than shown with a caveat, because a number with an
- * asterisk still gets read as a number.
- */
 export function ExecutorDetail({
   executor,
   id,
@@ -15,7 +8,6 @@ export function ExecutorDetail({
 }: {
   executor: Executor;
   id: string;
-  /** Stops the click reaching the row, which would collapse the card. */
   onNavigate: (event: React.MouseEvent) => void;
 }) {
   const winRate = withhold(executor.winRate, executor.closedTrades);

@@ -1,16 +1,4 @@
-/**
- * The isometric cube and wordmark, as one center-aligned stack.
- *
- * The cube is centered on the wordmark by layout, never by a tuned pixel
- * offset (§5.2) — the flex column does the centering, so changing the cube
- * size cannot knock it out of alignment.
- */
 
-/**
- * Brand tint for the cube's top face. Deliberately local: it is the one color
- * on the page outside the §2 set, and it earns that only by being part of the
- * mark rather than the interface.
- */
 const CUBE_TOP = "#8E76D6";
 
 export function Wordmark({
@@ -20,7 +8,6 @@ export function Wordmark({
 }: {
   cubeWidth: number;
   cubeHeight: number;
-  /** Horizontal nudge for the cube alone, px. */
   cubeShiftX?: number;
 }) {
   return (

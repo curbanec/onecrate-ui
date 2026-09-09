@@ -3,14 +3,6 @@ import type { FleetSummary } from "@/lib/fleet";
 import { FreshnessStrip } from "./freshness-strip";
 import { PlatformTotals } from "./platform-totals";
 
-/**
- * Header band (§5.3).
- *
- * The height is derived from the hairline cross, never hardcoded: the band's
- * bottom rule has to land on the same y as the cross's horizontal arm, and
- * that alignment is the whole reason the cross exists (§5.2). Pass the same
- * `crossConfig` here and to <Rail> or the two will drift apart.
- */
 export function HeaderBand({
   title,
   summary,

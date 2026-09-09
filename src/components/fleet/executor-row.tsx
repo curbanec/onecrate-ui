@@ -4,21 +4,6 @@ import type { Executor } from "@/lib/fleet";
 import { ExecutorDetail } from "./executor-detail";
 import { SignalSlot } from "./signal-slot";
 
-/**
- * One executor card (§5.4) — a full-width row, not a grid cell.
- *
- * Expansion vs navigation (§5.5): expanding is reversible, navigating is not,
- * so the large target belongs to expansion. The card body toggles; the card is
- * never itself a link. Navigation lives on exactly two precise targets — the
- * identifier and "Open detail →" — and both stop propagation so they don't
- * also toggle the card underneath them.
- *
- * The row div carries the click for pointer users, but a bare div is not
- * reachable by keyboard and nesting a link inside a `role="button"` would be
- * invalid. So the caret is a real <button> with aria-expanded: pointer users
- * get the whole card, keyboard and screen-reader users get a proper control,
- * and no interactive element nests inside another.
- */
 export function ExecutorRow({
   executor,
   open,
@@ -42,7 +27,6 @@ export function ExecutorRow({
         style={{ gridTemplateColumns: EXECUTOR_GRID, minHeight: ROW_MIN_HEIGHT }}
       >
         <div>
-          {/* The only navigation target on the card (§5.4). */}
           <a
             href={`/executors/${executor.id}`}
             onClick={stop}

@@ -1,10 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * §2.5. Open/idle/halted reuse gain/flat/loss rather than introducing new
- * colors; `stale` is the one amber in the system, which is what makes it read
- * as a warning.
- */
 export type Status = "open" | "idle" | "halted" | "stale";
 
 const TONES: Record<Status, string> = {

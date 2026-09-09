@@ -5,7 +5,6 @@ import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = {
   title: "Sign in · OneCrate",
-  // The operator tool is not something to index.
   robots: { index: false, follow: false },
 };
 
@@ -14,9 +13,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const raw = params.next;
   const candidate = Array.isArray(raw) ? raw[0] : raw;
 
-  // Proxy round-trips the intended destination through this param. Reject
-  // anything not an internal path — `//evil.com` is protocol-relative and would
-  // otherwise leave the site.
   const next =
     candidate && candidate.startsWith("/") && !candidate.startsWith("//")
       ? candidate

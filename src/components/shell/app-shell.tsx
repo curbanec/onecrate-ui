@@ -2,10 +2,6 @@ import type { CrossConfig } from "@/lib/design";
 import type { NavItem } from "@/lib/fleet";
 import { Rail } from "./rail";
 
-/**
- * The page shell (§5.1): rail plus content, framed as one panel on the `desk`
- * surface.
- */
 export function AppShell({
   active,
   crossConfig,

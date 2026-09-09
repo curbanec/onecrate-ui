@@ -6,7 +6,6 @@ import { EXECUTOR_GRID } from "@/lib/design";
 import type { Executor } from "@/lib/fleet";
 import { ExecutorRow } from "./executor-row";
 
-/** Column headers, in spine order (§5.4). */
 const COLUMNS = [
   { label: "executor", align: "" },
   { label: "allocated", align: "text-right" },
@@ -16,13 +15,6 @@ const COLUMNS = [
   { label: "signal", align: "pl-5" },
 ] as const;
 
-/**
- * Executor list (§5.4).
- *
- * Open state is a keyed map rather than a single index, because §5.5 requires
- * that several cards can be open at once — comparing two executors is the
- * whole reason to expand one.
- */
 export function ExecutorTable({ executors }: { executors: Executor[] }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS, type NavItem } from "@/lib/fleet";
 
-/** Four destinations, no grouping, no icons. There is not enough here to need them. */
 export function RailNav({ active }: { active: NavItem }) {
   return (
     <nav className="flex flex-col gap-0.5 p-[10px_8px]">

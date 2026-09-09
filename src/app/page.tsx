@@ -10,20 +10,11 @@ export const metadata: Metadata = {
   description: "Operator console for algorithmic trading executors.",
 };
 
-/**
- * Splash.
- *
- * Deliberately not a marketing landing page: no KPI row, no gradient area
- * chart, no claimed figures (§8). Nothing here is a number, because there is no
- * data source behind a splash and an invented one would be a lie (§6.7). What it
- * shows is the mark, what the thing is, and the way in.
- */
 export default function Page() {
   return (
     <main className="flex min-h-full flex-col p-4">
       <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col">
         <header className="flex items-start justify-between">
-          {/* The signature alignment mark (§5.2), reused as the splash's anchor. */}
           <div className="w-[188px]">
             <HairlineCross bleed={0} />
           </div>

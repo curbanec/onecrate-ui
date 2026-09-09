@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/** Column header or field label — uppercase, letterspaced, muted (§3.1, §7). */
 export function Label({
   children,
   className,

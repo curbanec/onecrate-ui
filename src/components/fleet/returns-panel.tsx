@@ -3,14 +3,6 @@ import type { FleetSeries, FleetSummary } from "@/lib/fleet";
 import { ChartLegend } from "./chart-legend";
 import { FleetChart } from "./fleet-chart";
 
-/**
- * Platform return, above the executor list.
- *
- * Two numbers that answer different questions, each with a one-clause
- * explanation in lowercase (§7). Capital-weighted takes the result colors
- * because it is the result; equal-weighted takes its own series color, which
- * is what ties the figure to the dashed line below it.
- */
 export function ReturnsPanel({
   summary,
   series,

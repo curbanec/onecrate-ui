@@ -1,10 +1,3 @@
-/**
- * Reconciliation drift (§6.5).
- *
- * A banner, not a panel: invisible when drift is zero, impossible to ignore
- * when it is not. There is deliberately no always-on "no drift" readout
- * anywhere — a permanent green tick trains the reader to stop looking.
- */
 export function DriftBanner({ drift }: { drift: boolean }) {
   if (!drift) return null;
 
