@@ -137,7 +137,14 @@ emitted `http://127.0.0.1:3000/login` — the internal container address, over h
 where the session cookie is `Secure`.
 
 `redirectBase()` in `src/proxy.ts` builds from the canonical origin instead, and
-falls back to the request origin only for genuinely local hosts (dev, probes).
+falls back to the request origin only for hosts served directly: localhost, and
+the app's own `*.azurecontainerapps.io` FQDN.
+
+That FQDN allowance exists because there is only one deployment — it is the only
+way to inspect the app before the onecrate.io records exist. Note that **signing
+in there does not work**: `trustedOrigins` is pinned to `APP_ORIGIN`, so an auth
+POST from the FQDN is rejected. It proves the container runs and serves; it is
+not a second front door.
 
 ### Better Auth's published MSSQL sample does not typecheck
 

@@ -31,7 +31,7 @@ export default function proxy(req: NextRequest) {
    */
   const host = req.headers.get("host");
   const canonical = canonicalHost();
-  if (host && host !== canonical && !isLocal(host)) {
+  if (host && host !== canonical && !isServedDirectly(host)) {
     return NextResponse.redirect(`${canonicalOrigin()}${pathname}${search}`, 308);
   }
 
@@ -58,9 +58,27 @@ export default function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-/** Dev and in-cluster health probes have no canonical host to enforce. */
-function isLocal(host: string): boolean {
-  return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+/**
+ * Hosts served as-is rather than redirected to the canonical origin.
+ *
+ * Local covers dev and in-cluster probes. The `.azurecontainerapps.io` FQDN is
+ * the one Azure assigns this app: it always has a valid certificate, and with a
+ * single production environment it is the ONLY way to inspect a deploy before
+ * the onecrate.io DNS records exist. Redirecting it away would leave the first
+ * deploy unverifiable.
+ *
+ * Note that signing in still requires the canonical host — Better Auth's
+ * trustedOrigins is pinned to APP_ORIGIN, so an auth POST from the FQDN is
+ * rejected. Reaching the FQDN proves the container runs and serves; it is not a
+ * second front door.
+ */
+function isServedDirectly(host: string): boolean {
+  const hostname = host.split(":")[0];
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.endsWith(".azurecontainerapps.io")
+  );
 }
 
 /**
@@ -77,7 +95,20 @@ function isLocal(host: string): boolean {
  */
 function redirectBase(req: NextRequest): string {
   const host = req.headers.get("host");
-  return host && isLocal(host) ? req.nextUrl.origin : canonicalOrigin();
+  if (!host) return canonicalOrigin();
+
+  const hostname = host.split(":")[0];
+
+  // Dev: nextUrl is accurate, and http is correct here.
+  if (hostname === "localhost" || hostname === "127.0.0.1") return req.nextUrl.origin;
+
+  // Azure FQDN: build from the Host header, NOT nextUrl. Behind ingress nextUrl
+  // is the internal listen address, so falling back to it emits a Location of
+  // http://<internal>:3000/login — unreachable, and http where the session
+  // cookie is Secure. Ingress always terminates TLS, so https is right.
+  if (hostname.endsWith(".azurecontainerapps.io")) return `https://${host}`;
+
+  return canonicalOrigin();
 }
 
 export const config = {

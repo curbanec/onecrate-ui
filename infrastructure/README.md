@@ -5,6 +5,17 @@ trading executors** so the UI shares their internal DNS and Log Analytics
 workspace. The executors have no ingress; this is the one component in the
 environment reachable from the internet.
 
+## One deployment, to production
+
+There is no dev deployment of the UI. The PROD/DEV switch in the rail is a
+**view toggle** over which dataset you are looking at, not a deployment
+boundary — a second environment would be a second copy of the same app showing
+the same two views.
+
+The practical consequence: the container app's own `*.azurecontainerapps.io`
+FQDN is the only way to inspect a deploy before DNS exists, so `src/proxy.ts`
+serves that hostname directly instead of redirecting it to the canonical origin.
+
 ---
 
 ## The constraint that shapes everything
@@ -37,9 +48,13 @@ has an FQDN. So the first deployment binds no domain.
 
 ### 1. Create the auth database
 
-Auth tables are separate from trade data, with separate credentials. Create a
-database on the existing Azure SQL server, then from a machine whose IP is
-allowed through the SQL firewall:
+Auth tables are separate from trade data, with separate credentials. **The SQL
+server is not in Bicep** — it predates this repo and reaches the executors as a
+connection string, so find its name in the portal.
+
+Create a database (`onecrate-auth`) and a user for the app, fill both into
+`infrastructure/ui.bicepparam`, then from a machine whose IP is allowed through
+the SQL firewall:
 
 ```bash
 cp .env.example .env.local        # fill in AUTH_DB_* and BETTER_AUTH_SECRET
@@ -51,76 +66,76 @@ npm run seed:operator             # SEED_EMAIL / SEED_PASSWORD in the environmen
 `auth:migrate` is Better Auth's CLI. Run `npm run auth:generate` first if you
 want to inspect the SQL before it is applied.
 
-### 2. First deployment — no custom domain
+**Also set "Allow Azure services and resources to access this server"** on the
+SQL server firewall. Without it the container starts, passes its health probe,
+and every sign-in fails — because `/api/health` deliberately does not touch SQL.
 
-Run `build-deploy-pipeline.yml` in Azure DevOps with `targetEnvironment: dev`
-(or `prod`). It validates, builds, pushes, deploys, and smoke-tests
-`/api/health`.
+### 2. Create the variable group
 
-The pipeline needs a variable group per environment —
-`onecrate-ui-dev-variables` / `onecrate-ui-prod-variables` — each supplying
-**`BETTER_AUTH_SECRET`** and **`AUTH_DB_PASSWORD`** as *secret* variables.
-Everything non-secret lives in `infrastructure/parameters/{dev,prod}.bicepparam`.
+`onecrate-ui-variables` in Azure DevOps, supplying **`BETTER_AUTH_SECRET`** and
+**`AUTH_DB_PASSWORD`** as *secret* variables. Everything non-secret lives in
+`infrastructure/ui.bicepparam`.
 
-The deploy step fails fast if either secret is unset. That guard is not
-decoration: an undefined `$(VAR)` macro survives into the script unsubstituted,
-and single-quoted it reaches Bicep as the literal string `"$(VAR)"` with no
-error — so a deploy can "succeed" with the session signing key set to a pipeline
+The deploy step fails fast if either is unset. That guard is not decoration: an
+undefined `$(VAR)` macro survives into the script unsubstituted, and
+single-quoted it reaches Bicep as the literal string `"$(VAR)"` with no error —
+so a deploy can "succeed" with the session signing key set to a pipeline
 template fragment.
+
+### 3. First deployment — no custom domain
+
+Run `build-deploy-pipeline.yml`. It validates, builds, pushes, deploys, and
+smoke-tests `/api/health`, then prints the FQDN, the static IP, and the exact
+DNS records to create.
+
+`trigger: none`, so starting the pipeline is itself the deliberate act of
+deploying to production; there is no separate approval gate.
 
 To deploy by hand instead:
 
 ```bash
 az deployment group create \
-  --resource-group trading-dev \
+  --resource-group trading-prod \
   --template-file infrastructure/ui.bicep \
-  --parameters infrastructure/parameters/dev.bicepparam \
-  --parameters containerImage=<acr>.azurecr.io/onecrate-ui:<tag> \
-               acrLoginServer=<acr>.azurecr.io \
+  --parameters infrastructure/ui.bicepparam \
+  --parameters containerImage=tradingacrdev.azurecr.io/onecrate-ui:<tag> \
+               acrLoginServer=tradingacrdev.azurecr.io \
                acrUsername=<user> acrPassword=<password> \
                betterAuthSecret=<secret> authDbPassword=<password>
 ```
 
-The pipeline prints `fqdn` and `staticIp` at the end. Both are needed next.
+At this point the app is live at `https://<fqdn>` with a valid Azure
+certificate. You can browse the splash and `/login`; **signing in will not work
+yet**, because Better Auth's `trustedOrigins` is pinned to `APP_ORIGIN`. Reaching
+the FQDN proves the container runs, serves, and started without failing its
+environment checks.
 
-#### The dev chicken-and-egg
-
-`APP_ORIGIN` drives the apex→www redirect, the cookie scope, and auth callbacks.
-Dev has no custom domain, so its canonical origin *is* the container app FQDN —
-which does not exist until after the first deploy. So the first dev run
-deliberately has a placeholder in `dev.bicepparam`: run it once, take the `fqdn`
-the pipeline prints, paste it in, run again.
-
-Until that is done the app is deployed but redirecting to a host it does not
-answer on. The pipeline emits a **warning** rather than failing, because the same
-mismatch is expected and temporary during the prod custom-domain rollout below.
-
-### 3. Get the validation tokens
+### 4. Get the validation tokens
 
 In the portal, add `www.onecrate.io` as a custom domain on the container app and
 copy the validation token. Repeat for the apex. The token is what the `asuid`
 TXT records carry.
 
-### 4. Create the DNS records in Wix
+### 5. Create the DNS records in Wix
 
 Delete any pre-existing A or CNAME records for the same hosts first — Wix's docs
 are explicit that leftover records conflict.
 
-| Type  | Host        | Value                                    |
-| ----- | ----------- | ---------------------------------------- |
-| CNAME | `www`       | the container app FQDN (output `fqdn`)   |
-| TXT   | `asuid.www` | Azure domain validation token            |
+| Type  | Host        | Value                                      |
+| ----- | ----------- | ------------------------------------------ |
+| CNAME | `www`       | the container app FQDN (output `fqdn`)     |
+| TXT   | `asuid.www` | Azure domain validation token              |
 | A     | `@`         | environment static inbound IP (`staticIp`) |
-| TXT   | `asuid`     | Azure domain validation token for apex   |
+| TXT   | `asuid`     | Azure domain validation token for apex     |
 
 Propagation is typically minutes.
 
-### 5. Second deployment — bind the domains
+### 6. Second deployment — bind the domains
 
-Uncomment the populated `customDomains` block in
-`infrastructure/parameters/prod.bicepparam` and re-run the pipeline. Validation
-method differs per record shape: `www` is a CNAME so it validates by CNAME; the
-apex is a pinned A record so it validates by TXT via the `asuid` record.
+Uncomment the populated `customDomains` block in `infrastructure/ui.bicepparam`
+and re-run the pipeline. Validation method differs per record shape: `www` is a
+CNAME so it validates by CNAME; the apex is a pinned A record so it validates by
+TXT via the `asuid` record.
 
 ```bicep
 param customDomains = [
@@ -134,21 +149,19 @@ creates and validates them before binding. If DNS is not yet resolving, the
 certificate creation fails and the whole deployment rolls back — the app keeps
 serving its previous revision.
 
-Azure then issues free, auto-renewing managed certificates.
-
-### 6. Verify
+### 7. Verify
 
 ```bash
-curl -sI https://onecrate.io/fleet         # expect 308 → https://www.onecrate.io/fleet
-curl -sI https://www.onecrate.io/fleet     # expect 307 → /login (unauthenticated)
+curl -sI https://onecrate.io/fleet         # expect 308 -> https://www.onecrate.io/fleet
+curl -sI https://www.onecrate.io/fleet     # expect 307 -> /login (unauthenticated)
 curl -s  https://www.onecrate.io/api/health
 ```
 
-The apex→www redirect is served by the app (`src/proxy.ts`), not by DNS or
+The apex-to-www redirect is served by the app (`src/proxy.ts`), not by DNS or
 ingress. Container Apps has no host-redirect primitive, so it has to land
 somewhere — and it is in Proxy rather than `next.config.ts` because
-`redirects()` is baked into the routes manifest at build time, while the promote
-pipeline ships one image tag to both dev and prod.
+`redirects()` is baked into the routes manifest at build time, while the image is
+built once and configured per deployment.
 
 ---
 
@@ -165,20 +178,37 @@ everyone out.
 
 ---
 
+## What already exists vs. what is new
+
+| Piece | Status |
+| --- | --- |
+| Container App Environment | exists — `trading-prod-env`, public (no `vnetConfiguration`), so external ingress works |
+| ACR | exists — `tradingacrdev`, shared with the executors despite the name; the repo auto-creates on first push |
+| Log Analytics | exists, wired to the environment |
+| Azure SQL **server** | exists, outside Bicep |
+| Auth **database** and user | new — §1 |
+| SQL firewall rule | new — §1 |
+| Variable group | new — §2 |
+| Container App | new — created by `ui.bicep` |
+| Custom domains and certs | new — §4–6. Managed certificates are free |
+
+> **Unverified:** that `trading-prod-env` exists. Prod executor deploys go
+> through `executor.bicep`, which does not create environments. Check with
+> `az containerapp env list -g trading-prod -o table` before the first run — if
+> it is missing, the `existing` lookup in `ui.bicep` fails.
+
+---
+
 ## Environment variables
 
 Set as Container App secrets by `ui.bicep`, never as a file in the image.
 
-| Variable             | Notes                                                            |
-| -------------------- | ---------------------------------------------------------------- |
-| `APP_ORIGIN`         | Canonical origin. Must be https in production or the app refuses to start. |
+| Variable | Notes |
+| --- | --- |
+| `APP_ORIGIN` | Canonical origin. Must be https in production or the app refuses to start. |
 | `BETTER_AUTH_SECRET` | **Not optional.** Better Auth falls back to a *default* secret when unset, which makes sessions forgeable. `src/instrumentation.ts` turns that into a startup failure. |
-| `AUTH_DB_SERVER`     | Azure SQL host                                                    |
-| `AUTH_DB_NAME`       | Auth database                                                     |
-| `AUTH_DB_USER`       | Auth database user                                                |
-| `AUTH_DB_PASSWORD`   | Auth database password                                            |
-| `AUTH_DB_PORT`       | Defaults to 1433                                                  |
-
-The Azure SQL firewall must allow Azure services, or the Container App's
-outbound IP, or the container cannot reach the auth database and every sign-in
-fails.
+| `AUTH_DB_SERVER` | Azure SQL host |
+| `AUTH_DB_NAME` | Auth database |
+| `AUTH_DB_USER` | Auth database user |
+| `AUTH_DB_PASSWORD` | Auth database password |
+| `AUTH_DB_PORT` | Defaults to 1433 |
