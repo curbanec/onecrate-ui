@@ -70,11 +70,21 @@ want to inspect the SQL before it is applied.
 SQL server firewall. Without it the container starts, passes its health probe,
 and every sign-in fails — because `/api/health` deliberately does not touch SQL.
 
-### 2. Create the variable group
+### 2. Add the secrets to the variable group
 
-`onecrate-ui-variables` in Azure DevOps, supplying **`BETTER_AUTH_SECRET`** and
+`trading-prod-variables` in Azure DevOps, supplying **`BETTER_AUTH_SECRET`** and
 **`AUTH_DB_PASSWORD`** as *secret* variables. Everything non-secret lives in
 `infrastructure/ui.bicepparam`.
+
+The group is shared with the trading pipelines (`promote`, `function-deploy`).
+Neither key collides with what those already supply, and this app reads only
+those two from it.
+
+Authorize the group for this pipeline specifically: Library -> the group ->
+Pipeline permissions. Authorization is per-pipeline, so the trading pipelines
+already having access does not cover this one — without it the YAML fails to
+compile with "Variable group was not found or is not authorized for use",
+before any step runs.
 
 The deploy step fails fast if either is unset. That guard is not decoration: an
 undefined `$(VAR)` macro survives into the script unsubstituted, and
