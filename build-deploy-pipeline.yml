@@ -64,6 +64,13 @@ stages:
           - script: npm run lint
             displayName: 'Lint'
 
+          # PageProps/LayoutProps are generated globals, not imports: Next writes
+          # them into .next/types during dev, build, or typegen. CI type-checks a
+          # fresh clone that has no .next/, so without this every route using
+          # them fails with TS2304. 'typegen' does it without a full build.
+          - script: npx next typegen
+            displayName: 'Generate route types'
+
           - script: npx tsc --noEmit -p tsconfig.json
             displayName: 'Typecheck'
 
