@@ -1,0 +1,277 @@
+# =============================================================================
+# onecrate-ui — build and deploy to Azure Container Apps
+# =============================================================================
+# Deliberately ONE parameterised pipeline rather than the executors' split
+# build-deploy / promote pair. That split exists because a promote run ships a
+# chosen image tag to a *subset* of executors. The UI is a single app, so the
+# prod path is the same pipeline with a manual gate rather than a near-duplicate
+# file.
+#
+# Requires, in Azure DevOps:
+#   - Service connection 'ACR-TradingShared'      (Docker registry)
+#   - Service connection 'Azure-ServiceConnection' (ARM)
+#   - Variable groups 'onecrate-ui-dev-variables' / 'onecrate-ui-prod-variables'
+#     each supplying BETTER_AUTH_SECRET and AUTH_DB_PASSWORD as secret variables.
+# =============================================================================
+
+trigger: none
+
+parameters:
+  - name: targetEnvironment
+    displayName: 'Target environment'
+    type: string
+    default: dev
+    values:
+      - dev
+      - prod
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Supplies BETTER_AUTH_SECRET and AUTH_DB_PASSWORD. Without a group, an
+  # undefined $(VAR) macro survives into the script unsubstituted — and where it
+  # is single-quoted it reaches Bicep as the literal string "$(VAR)" with no
+  # error, so a deploy can "succeed" with garbage parameter values. The guards in
+  # the deploy step exist because of that failure mode.
+  - group: onecrate-ui-${{ parameters.targetEnvironment }}-variables
+  - name: imageName
+    value: 'onecrate-ui'
+  - name: acrName
+    value: 'tradingacr${{ parameters.targetEnvironment }}'
+  - name: acrLoginServer
+    value: 'tradingacr${{ parameters.targetEnvironment }}.azurecr.io'
+  - name: resourceGroup
+    value: 'trading-${{ parameters.targetEnvironment }}'
+  - name: paramFile
+    value: 'infrastructure/parameters/${{ parameters.targetEnvironment }}.bicepparam'
+
+stages:
+  # ---------------------------------------------------------------------------
+  - stage: Validate
+    displayName: 'Validate'
+    jobs:
+      - job: ValidateJob
+        steps:
+          - task: NodeTool@0
+            displayName: 'Use Node 22'
+            inputs:
+              # Next 16 requires >= 20.9; the Dockerfile builds on 22, so CI
+              # type-checks against the same major it ships on.
+              versionSpec: '22.x'
+
+          - script: npm ci
+            displayName: 'npm ci'
+
+          - script: npm run lint
+            displayName: 'Lint'
+
+          - script: npx tsc --noEmit -p tsconfig.json
+            displayName: 'Typecheck'
+
+          # Compiles the template and the parameter file. Catches a malformed
+          # resource or a param the template does not declare here, in seconds,
+          # rather than half a Docker build later.
+          - task: AzureCLI@2
+            displayName: 'Compile Bicep'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+                az bicep install
+                az bicep build --file infrastructure/ui.bicep --stdout > /dev/null
+                az bicep build-params --file $(paramFile) --stdout > /dev/null
+                echo "✓ Bicep compiles"
+
+  # ---------------------------------------------------------------------------
+  - stage: Build
+    displayName: 'Build and push image'
+    dependsOn: Validate
+    jobs:
+      - job: BuildJob
+        steps:
+          - task: Docker@2
+            displayName: 'Build image'
+            inputs:
+              containerRegistry: 'ACR-TradingShared'
+              command: 'build'
+              repository: '$(imageName)'
+              dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          - task: Docker@2
+            displayName: 'Push to ACR'
+            inputs:
+              containerRegistry: 'ACR-TradingShared'
+              command: 'push'
+              repository: '$(imageName)'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          - script: |
+              echo "=========================================="
+              echo "Image pushed: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
+              echo "=========================================="
+            displayName: 'Print image tag'
+
+  # ---------------------------------------------------------------------------
+  # Prod only. The UI shows live P&L and holds the session secret, so a prod
+  # deploy is a deliberate act.
+  - stage: Approve
+    displayName: 'Approval (prod only)'
+    dependsOn: Build
+    condition: and(succeeded(), eq('${{ parameters.targetEnvironment }}', 'prod'))
+    jobs:
+      - job: ApprovalJob
+        displayName: 'Wait for approval'
+        pool: server
+        timeoutInMinutes: 1440
+        steps:
+          - task: ManualValidation@0
+            inputs:
+              notifyUsers: ''
+              instructions: 'Approve deploy of $(imageName):$(Build.BuildId) to PROD (www.onecrate.io).'
+              onTimeout: 'reject'
+
+  # ---------------------------------------------------------------------------
+  - stage: Deploy
+    displayName: 'Deploy to ${{ parameters.targetEnvironment }}'
+    dependsOn:
+      - Build
+      - Approve
+    # Approve is skipped for dev; skipped is not failed, so gate on "not failed"
+    # rather than succeeded() or dev would never deploy.
+    condition: and(succeeded('Build'), not(failed('Approve')), not(canceled()))
+    jobs:
+      - job: DeployJob
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Deploy container app'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+
+                # Fail loudly on unset secrets. Bicep would otherwise accept the
+                # literal "$(BETTER_AUTH_SECRET)" as the signing key, and the app
+                # would come up serving sessions signed with a string from a
+                # pipeline template.
+                for var in BETTER_AUTH_SECRET AUTH_DB_PASSWORD; do
+                  value="${!var:-}"
+                  if [ -z "$value" ] || [[ "$value" == '$('* ]]; then
+                    echo "##vso[task.logissue type=error]$var is not set in variable group onecrate-ui-${{ parameters.targetEnvironment }}-variables."
+                    exit 1
+                  fi
+                done
+
+                echo "Container image: $(acrLoginServer)/$(imageName):$(Build.BuildId)"
+
+                ACR_USERNAME=$(az acr credential show --name $(acrName) --query username -o tsv)
+                ACR_PASSWORD=$(az acr credential show --name $(acrName) --query "passwords[0].value" -o tsv)
+
+                az deployment group create \
+                  --resource-group $(resourceGroup) \
+                  --template-file $(Build.SourcesDirectory)/infrastructure/ui.bicep \
+                  --parameters $(Build.SourcesDirectory)/$(paramFile) \
+                  --parameters containerImage='$(acrLoginServer)/$(imageName):$(Build.BuildId)' \
+                  --parameters acrLoginServer='$(acrLoginServer)' \
+                  --parameters acrUsername="$ACR_USERNAME" \
+                  --parameters acrPassword="$ACR_PASSWORD" \
+                  --parameters betterAuthSecret="$BETTER_AUTH_SECRET" \
+                  --parameters authDbPassword="$AUTH_DB_PASSWORD" \
+                  --name "onecrate-ui-$(Build.BuildId)" \
+                  --verbose
+
+                echo "✓ Deployed"
+            env:
+              # Secret variables are not auto-mapped into the script environment.
+              BETTER_AUTH_SECRET: $(BETTER_AUTH_SECRET)
+              AUTH_DB_PASSWORD: $(AUTH_DB_PASSWORD)
+
+          - task: AzureCLI@2
+            displayName: 'Report endpoints and check canonical origin'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+
+                FQDN=$(az deployment group show \
+                  --resource-group $(resourceGroup) \
+                  --name "onecrate-ui-$(Build.BuildId)" \
+                  --query properties.outputs.fqdn.value -o tsv)
+                STATIC_IP=$(az deployment group show \
+                  --resource-group $(resourceGroup) \
+                  --name "onecrate-ui-$(Build.BuildId)" \
+                  --query properties.outputs.staticIp.value -o tsv)
+                APP_ORIGIN=$(az containerapp show \
+                  --resource-group $(resourceGroup) \
+                  --name onecrate-ui-${{ parameters.targetEnvironment }} \
+                  --query "properties.template.containers[0].env[?name=='APP_ORIGIN'].value | [0]" -o tsv)
+
+                echo "=========================================="
+                echo "FQDN         : $FQDN"
+                echo "Static IP    : $STATIC_IP   (apex A record)"
+                echo "APP_ORIGIN   : $APP_ORIGIN"
+                echo "=========================================="
+                echo "DNS records (Wix):"
+                echo "  CNAME  www        -> $FQDN"
+                echo "  A      @          -> $STATIC_IP"
+                echo "  TXT    asuid.www  -> <validation token from portal>"
+                echo "  TXT    asuid      -> <validation token from portal>"
+                echo "=========================================="
+
+                # APP_ORIGIN drives the apex->www redirect, cookie scope, and auth
+                # callbacks. If it names a host this app does not answer on, every
+                # request 308s somewhere unreachable — a fully deployed, fully
+                # broken app. Warn rather than fail: during the two-phase custom
+                # domain rollout the mismatch is expected and temporary.
+                ORIGIN_HOST=${APP_ORIGIN#https://}
+                if [ "$ORIGIN_HOST" != "$FQDN" ]; then
+                  BOUND=$(az containerapp show \
+                    --resource-group $(resourceGroup) \
+                    --name onecrate-ui-${{ parameters.targetEnvironment }} \
+                    --query "properties.configuration.ingress.customDomains[].name" -o tsv || true)
+                  if ! echo "$BOUND" | grep -qx "$ORIGIN_HOST"; then
+                    echo "##vso[task.logissue type=warning]APP_ORIGIN is $APP_ORIGIN but $ORIGIN_HOST is not bound to this app (bound: ${BOUND:-none}). Traffic will be redirected to a host that does not serve it. Expected only between the two custom-domain deploys."
+                  fi
+                fi
+
+          - task: AzureCLI@2
+            displayName: 'Smoke test'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+
+                FQDN=$(az deployment group show \
+                  --resource-group $(resourceGroup) \
+                  --name "onecrate-ui-$(Build.BuildId)" \
+                  --query properties.outputs.fqdn.value -o tsv)
+
+                # Ingress takes a moment to route to the new revision.
+                for i in $(seq 1 10); do
+                  CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://$FQDN/api/health" || echo 000)
+                  if [ "$CODE" = "200" ]; then
+                    echo "✓ /api/health returned 200"
+                    exit 0
+                  fi
+                  echo "attempt $i: /api/health returned $CODE, retrying..."
+                  sleep 10
+                done
+
+                echo "##vso[task.logissue type=error]/api/health never returned 200."
+                echo "Most likely causes: a required env var is missing (the app refuses"
+                echo "to start — see src/instrumentation.ts), or the container cannot"
+                echo "reach Azure SQL. Check: az containerapp logs show -n onecrate-ui-${{ parameters.targetEnvironment }} -g $(resourceGroup)"
+                exit 1
