@@ -1,0 +1,60 @@
+# =============================================================================
+# .claudeignore — onecrate-ui (Operator UI)
+# =============================================================================
+# ClaudeSync respects .gitignore first, then layers this on top.
+# Only add patterns here that .gitignore doesn't already cover.
+# Goal: sync high-signal architectural files, skip noise.
+#
+# Already covered by .gitignore, so deliberately not repeated here:
+#   node_modules/  .next/  .env*  *.tsbuildinfo  next-env.d.ts
+# =============================================================================
+
+# Lock file (415KB, zero architectural value)
+package-lock.json
+
+# -----------------------------------------------------------------------------
+# docs/ — reference material, not application code
+# -----------------------------------------------------------------------------
+# The rules these express are already captured in DESIGN_SYSTEM.md, which is the
+# authoritative source and stays synced. The raw artifacts are large and add no
+# context that the design doc doesn't state more precisely.
+
+# Design canvas export the Fleet layout was derived from (~22KB of generated markup)
+docs/*.dc.html
+
+# Canvas runtime vendored alongside it (~69KB, third-party, not ours)
+docs/support.js
+
+# Screenshots (~380KB of binary; Claude cannot read them from a sync anyway)
+docs/screenshots/
+
+# -----------------------------------------------------------------------------
+# Binary assets
+# -----------------------------------------------------------------------------
+public/
+*.ico
+*.png
+*.jpg
+*.woff
+*.woff2
+
+# -----------------------------------------------------------------------------
+# Build & tooling noise
+# -----------------------------------------------------------------------------
+.dockerignore
+.npmrc
+components.json
+
+# Editor. .idea/ is NOT in this repo's .gitignore (checked), so it is excluded
+# here rather than assumed.
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ClaudeSync's own config (don't sync recursively)
+.claudesync/
+
+# This file itself
+.claudeignore

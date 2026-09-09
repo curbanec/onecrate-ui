@@ -1,0 +1,184 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* No dark palette is defined. DESIGN_SYSTEM.md §8 rules out dark mode; the dim
+   surface is earned through neutral tinting, not inversion. The variant stays
+   declared only so shadcn primitives carrying dark: classes remain valid CSS. */
+@custom-variant dark (&:is(.dark *));
+
+/* ── Design system tokens (DESIGN_SYSTEM.md §9) ───────────────────────────── */
+@theme inline {
+  /* Neutral ramp — periwinkle/indigo-slate, not grey and not purple (§2.1) */
+  --color-desk: var(--desk);
+  --color-panel: var(--panel);
+  --color-rail: var(--rail);
+  --color-raised: var(--raised);
+  --color-frame: var(--frame);
+  --color-hair: var(--hair);
+  --color-rule: var(--rule);
+  --color-muted: var(--muted);
+  --color-ink: var(--ink);
+
+  /* Result direction (§2.2) — the only saturated colors on the page */
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-flat: var(--flat);
+
+  /* Accent (§2.3) */
+  --color-accent: var(--accent);
+  --color-accent-surface: var(--accent-surface);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-line: var(--accent-line);
+
+  /* Lime — row hover and expanded-card tint ONLY (§2.4).
+     If this lands on anything numeric, that is a bug. */
+  --color-highlight: var(--highlight);
+
+  /* State (§2.5) — amber appears nowhere else, which is why it reads as warning */
+  --color-state-open: var(--gain);
+  --color-state-idle: var(--flat);
+  --color-state-halted: var(--loss);
+  --color-state-stale: var(--state-stale);
+
+  /* Destructive (§2.6) — deliberately darker than loss. A red number is
+     information; a red control is a warning. Never the same red. */
+  --color-destructive: var(--destructive);
+
+  /* Chart (§2.7) — neither series borrows gain or loss */
+  --color-chart-cw: var(--ink);
+  --color-chart-ew: var(--chart-ew);
+  --color-chart-ref: var(--flat);
+
+  /* Type (§3) */
+  --font-body: var(--font-inter), Inter, system-ui, sans-serif;
+  --font-numeric: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-numeric);
+
+  /* Radius (§4) — modest. Heavy rounding reads as consumer software. */
+  --radius-card: 6px;
+  --radius-control: 4px;
+
+  /* shadcn semantic tokens, re-pointed at the ramp above */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-ink);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+/* ── Type scale (§3.1) ────────────────────────────────────────────────────── */
+@theme {
+  /* The largest figure on the page is 20px. Enormous headline numbers are a
+     marketing habit and read as overconfident on data this thin. */
+  --text-heading: 28px;
+  --text-heading--line-height: 1;
+  --text-heading--font-weight: 500;
+  --text-heading--letter-spacing: -0.02em;
+
+  --text-data-lg: 20px;
+  --text-data-lg--line-height: 1.2;
+  --text-data-lg--font-weight: 500;
+
+  --text-data: 15px;
+  --text-data--line-height: 1.3;
+  --text-data--font-weight: 400;
+
+  --text-data-sm: 13px;
+  --text-data-sm--line-height: 1.3;
+  --text-data-sm--font-weight: 400;
+
+  --text-label: 11px;
+  --text-label--line-height: 1.2;
+  --text-label--font-weight: 500;
+  --text-label--letter-spacing: 0.07em;
+
+  --text-body: 14px;
+  --text-body--line-height: 1.5;
+  --text-body--font-weight: 400;
+
+  --text-note: 13px;
+  --text-note--line-height: 1.3;
+  --text-note--font-weight: 400;
+}
+
+:root {
+  /* Neutral ramp (§2.1) */
+  --desk: #E6E2EE;
+  --panel: #DCDDE7;
+  --rail: #D1D3E0;
+  --raised: #E5E6EE;
+  --frame: #C0C3D4;
+  --hair: #C6C8D7;
+  --rule: #A6A9BC;
+  --muted: #565B6B;
+  --ink: #1E2029;
+
+  /* Result direction (§2.2) — gain and loss differ in lightness as well as hue,
+     which is what keeps them separable under red-green color deficiency. */
+  --gain: #0E8A5F;
+  --loss: #C33A4C;
+  --flat: #9A94A6;
+
+  /* Accent (§2.3) */
+  --accent: #6B4FBB;
+  --accent-surface: #CDCBE4;
+  --accent-ink: #4A3689;
+  --accent-line: #C9BCEB;
+
+  /* Lime (§2.4) */
+  --highlight: #E2E7CD;
+
+  /* State (§2.5) / destructive (§2.6) */
+  --state-stale: #B4841F;
+  --destructive: #A32A2A;
+
+  /* Chart (§2.7) */
+  --chart-ew: #7A63C4;
+
+  /* shadcn semantics mapped onto the ramp */
+  --background: var(--desk);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--accent-surface);
+  --secondary-foreground: var(--accent-ink);
+  --muted-foreground: var(--muted);
+  --border: var(--hair);
+  --input: var(--hair);
+  --ring: var(--accent);
+  --radius: 4px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-desk text-ink font-body;
+  }
+  /* Tabular always, even though the numeric face is already fixed-width — it
+     also aligns the fallback face (§3). */
+  .font-numeric {
+    font-variant-numeric: tabular-nums;
+  }
+}

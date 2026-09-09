@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Archivo:wght@500;600;700&amp;family=Space+Grotesk:wght@400;500;700&amp;family=DM+Mono:wght@400;500&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#E6E2EE; }
+  a { color:#6B4FBB; }
+  a:hover { color:#4A3689; }
+</style>
+</helmet>
+
+<section style="display:flex; gap:56px; align-items:flex-start; padding:64px 64px 32px; font-family:Inter,sans-serif">
+  <sc-for list="{{ variants }}" as="v" hint-placeholder-count="2">
+    <div id="{{ v.key }}" style="width:1380px; flex:none">
+      <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:14px">
+        <span style="font:600 11px/1 Inter; letter-spacing:.12em; background:{{ v.accentSurface }}; color:#4A3689; padding:5px 7px; border-radius:4px">{{ v.badge }}</span>
+        <span style="font:500 13px/1 Inter; color:{{ v.ink }}">{{ v.name }}</span>
+        <span style="font:400 13px/1 Inter; color:{{ v.muted }}">{{ v.desc }}</span>
+      </div>
+
+      <div style="display:flex; background:{{ v.panel }}; color:{{ v.ink }}; min-height:780px; border:1px solid {{ v.frame }}; border-radius:6px; overflow:hidden">
+        <div style="width:188px; flex:none; background:{{ v.rail }}; border-right:1px solid {{ v.hair }}; display:flex; flex-direction:column">
+          <div style="padding: 16px; border-bottom: 1px solid {{ v.hair }}; position: relative">
+            <div style="position:relative; height:{{ cross.total }}; margin-top:{{ cross.top }}; margin-left:-16px; margin-right:-16px">
+              <div style="position:absolute; right:{{ cross.rightGap }}; bottom:{{ cross.logoBottom }}; padding-right:9px; display:flex; flex-direction:column; align-items:center; gap:10px">
+                <svg width="{{ cross.cubeW }}" height="{{ cross.cubeH }}" viewBox="0 0 26 30" style="display:block; transform:{{ cross.cubeShift }}"><polygon points="0,7.5 13,15 13,30 0,22.5" fill="#6B4FBB"></polygon><polygon points="13,0 26,7.5 13,15 0,7.5" fill="#8E76D6"></polygon><polygon points="26,7.5 26,22.5 13,30 13,15" fill="#4A3689"></polygon></svg>
+                <span style="font:600 22px/1 Inter; letter-spacing:-0.02em; white-space:nowrap">OneCrate</span>
+              </div>
+              <span style="position:absolute; left:{{ cross.x }}; top:{{ cross.armTop }}; width:{{ cross.hTotal }}; height:1px; margin-left:{{ cross.offset }}; background:{{ v.rule }}"></span>
+              <span style="position:absolute; left:{{ cross.x }}; top:0; width:1px; height:{{ cross.total }}; background:{{ v.rule }}"></span>
+            </div>
+            <div style="display:flex; margin-top:15px; border:1px solid {{ v.hair }}; border-radius:4px; overflow:hidden">
+              <button onClick="{{ setProd }}" style="flex:1; border:0; cursor:pointer; padding:6px 0; font:500 11px/1.2 Inter; letter-spacing:.06em; background:{{ prodT.bg }}; color:{{ prodT.color }}">PROD</button><button onClick="{{ setDev }}" style="flex:1; border:0; cursor:pointer; padding:6px 0; font:500 11px/1.2 Inter; letter-spacing:.06em; background:{{ devT.bg }}; color:{{ devT.color }}">DEV</button>
+            </div>
+          </div>
+          <nav style="display:flex; flex-direction:column; gap:2px; padding:10px 8px">
+            <sc-for list="{{ navT }}" as="i" hint-placeholder-count="4">
+              <a href="#" style="padding:8px 10px; border-radius:4px; text-decoration:none; font:500 13px/1.2 Inter; background:{{ i.bg }}; color:{{ i.color }}">{{ i.label }}</a>
+            </sc-for>
+          </nav>
+        </div>
+
+        <div style="flex:1; min-width:0; padding:16px">
+          <sc-if value="{{ drift }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; gap:10px; margin-bottom:14px; padding:9px 12px; border-radius:4px; background:#C33A4C; color:#FFFFFF; font:500 11px/1.2 Inter; letter-spacing:.06em"><span>RECONCILIATION DRIFT</span><span style="opacity:.9; letter-spacing:0">broker cash and ledger cash disagree</span></div>
+          </sc-if>
+
+          <div style="display:flex; align-items:stretch; justify-content:space-between; height:{{ cross.headerH }}; box-sizing:border-box; padding-bottom:4px; border-bottom:1px solid {{ v.hair }}">
+            <div style="display:flex; flex-direction:column; justify-content:space-between">
+              <div style="display:flex; align-items:baseline; gap:26px; align-self:flex-start; background:{{ v.raised }}; border:1px solid {{ v.hair }}; border-radius:4px; padding:10px 14px">
+                <div>
+                  <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">AS OF</div>
+                  <div style="display:flex; align-items:baseline; gap:8px; margin-top:6px">
+                    <span style="width:7px; height:7px; border-radius:50%; background:#B4841F"></span>
+                    <span style="font:400 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums">—</span>
+                    <span style="font:400 13px/1.3 Inter; color:{{ v.muted }}">timestamp not supplied</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">CARRIED MARKS</div>
+                  <div style="display:flex; align-items:baseline; gap:8px; margin-top:6px">
+                    <span style="font:400 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums">1</span>
+                    <span style="font:400 13px/1.3 Inter; color:{{ v.muted }}">gap-fade v3 · SNOW</span>
+                  </div>
+                </div>
+              </div>
+              <h1 style="margin:0; font:500 28px/1 Inter; letter-spacing:-0.02em">Fleet</h1>
+            </div>
+            <div style="display:flex; gap:30px; align-items:flex-end">
+              <div><div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">EXECUTORS</div><div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; margin-top:5px">3</div></div>
+              <div><div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">ALLOCATED</div><div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; margin-top:5px">$4,800</div></div>
+              <div><div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">CUMULATIVE P&amp;L</div><div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; margin-top:5px; color:#0E8A5F">+$167.22</div></div>
+              <div><div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">CLOSED TRADES</div><div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; margin-top:5px">49</div></div>
+            </div>
+          </div>
+
+          <div style="padding:16px 0 14px; border-bottom:1px solid {{ v.hair }}">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px">
+              <div style="display:flex; gap:28px">
+                <div>
+                  <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">CAPITAL-WEIGHTED</div>
+                  <div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; color:#0E8A5F; margin-top:6px">+3.48%</div>
+                  <div style="font:400 14px/1.5 Inter; color:{{ v.muted }}">what the book actually earned</div>
+                </div>
+                <div>
+                  <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}">EQUAL-WEIGHTED</div>
+                  <div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; color:#7A63C4; margin-top:6px">+2.60%</div>
+                  <div style="font:400 14px/1.5 Inter; color:{{ v.muted }}">how the average strategy behaved</div>
+                </div>
+              </div>
+              <div style="display:flex; gap:14px; flex:none; font:400 13px/1.3 Inter; color:{{ v.muted }}">
+                <span style="display:flex; align-items:center; gap:6px; white-space:nowrap"><span style="width:14px; height:2px; background:{{ v.ink }}"></span>capital-wtd</span>
+                <span style="display:flex; align-items:center; gap:6px; white-space:nowrap"><span style="width:14px; height:0; border-top:1.5px dashed #7A63C4"></span>equal-wtd</span>
+                <span style="display:flex; align-items:center; gap:6px; white-space:nowrap"><span style="width:7px; height:7px; border:1.5px solid #9A94A6; border-radius:50%"></span>carried mark</span>
+              </div>
+            </div>
+            <svg viewBox="0 0 1060 178" preserveAspectRatio="none" width="100%" height="168" style="display:block; overflow:visible; color:{{ v.ink }}">
+              <line x1="{{ chart.x0 }}" y1="{{ chart.zeroY }}" x2="{{ chart.x1 }}" y2="{{ chart.zeroY }}" stroke="#9A94A6" strokeWidth="1" strokeDasharray="3 3"></line>
+              <polyline points="{{ chart.ew }}" fill="none" stroke="#7A63C4" strokeWidth="1.5" strokeDasharray="5 4"></polyline>
+              <polyline points="{{ chart.cw }}" fill="none" stroke="currentColor" strokeWidth="2"></polyline>
+              <sc-for list="{{ chart.dots }}" as="d" hint-placeholder-count="12">
+                <circle cx="{{ d.x }}" cy="{{ d.y }}" r="{{ d.r }}" fill="{{ d.fill }}" stroke="{{ d.stroke }}" strokeWidth="1.4"></circle>
+              </sc-for>
+            </svg>
+            <div style="display:flex; justify-content:space-between; margin-top:8px; font:400 13px/1.3 Inter; color:{{ v.muted }}">
+              <span>curve shape illustrative · endpoints derived from sample data · 24 daily marks, gaps preserved</span>
+              <span>0% reference</span>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:300px 104px 104px 132px 104px 1fr 24px; font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}; padding:14px 8px 8px; border-bottom:1px solid {{ v.hair }}">
+            <span>EXECUTOR</span><span style="text-align:right">ALLOCATED</span><span style="text-align:right">DEPLOYED</span><span style="text-align:right">CUM. P&amp;L</span><span style="text-align:right">TRADES</span><span style="padding-left:20px">SIGNAL</span><span></span>
+          </div>
+
+          <sc-for list="{{ v.rows }}" as="r" hint-placeholder-count="3">
+            <div data-card="{{ r.id }}" data-screen-label="{{ r.id }}" onClick="{{ r.toggle }}" style="border-bottom:1px solid {{ v.hair }}; cursor:pointer" style-hover="background:{{ v.hover }}">
+              <div style="display:grid; grid-template-columns:300px 104px 104px 132px 104px 1fr 24px; align-items:center; min-height:36px; padding:8px">
+                <div>
+                  <a href="#" onClick="{{ r.stop }}" style="font:500 15px/1.3 {{ v.num }}; color:#6B4FBB; text-decoration:underline; text-underline-offset:3px; text-decoration-color:#C9BCEB">{{ r.title }}</a>
+                  <div style="font:400 13px/1.3 Inter; color:{{ v.muted }}; margin-top:3px">{{ r.note }}</div>
+                </div>
+                <div style="text-align:right; font:400 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums">{{ r.alloc }}</div>
+                <div style="text-align:right; font:400 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums; color:#9A94A6">{{ r.deployed }}</div>
+                <div style="text-align:right; font:500 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums; color:{{ r.pnlColor }}"><span style="color:#9A94A6; margin-right:5px">{{ r.mark }}</span>{{ r.pnl }}</div>
+                <div style="text-align:right">
+                  <div style="font:400 15px/1.3 {{ v.num }}; font-variant-numeric:tabular-nums; color:{{ r.evidence }}">{{ r.trades }}</div>
+                  <div style="font:400 13px/1.3 {{ v.num }}; color:#9A94A6; margin-top:2px">{{ r.nNote }}</div>
+                </div>
+                <div style="padding-left:20px">
+                  <div style="height:28px; border:1px solid {{ v.hair }}; border-radius:4px; background:repeating-linear-gradient(135deg, {{ v.accentSurface }} 0 5px, transparent 5px 11px); display:flex; align-items:center; padding:0 9px">
+                    <span style="font:400 13px/1.3 Inter; color:{{ v.muted }}">{{ r.slot }}</span>
+                  </div>
+                </div>
+                <div style="text-align:right; font:400 13px/1.3 Inter; color:{{ v.muted }}">{{ r.caret }}</div>
+              </div>
+              <sc-if value="{{ r.open }}" hint-placeholder-val="{{ false }}">
+                <div style="display:grid; grid-template-columns:1fr 1fr 188px; gap:14px; padding:2px 8px 14px; background:{{ v.hover }}">
+                  <div>
+                    <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}; margin-bottom:6px">RECENT TRADES</div>
+                    <div style="height:70px; border:1px solid {{ v.hair }}; border-radius:4px; background:repeating-linear-gradient(135deg, {{ v.accentSurface }} 0 5px, transparent 5px 11px); padding:8px; font:400 13px/1.5 Inter; color:{{ v.muted }}">{{ r.tradesSlot }}</div>
+                  </div>
+                  <div>
+                    <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}; margin-bottom:6px">PARAMETER SET</div>
+                    <div style="height:70px; border:1px solid {{ v.hair }}; border-radius:4px; background:repeating-linear-gradient(135deg, {{ v.accentSurface }} 0 5px, transparent 5px 11px); padding:8px; font:400 13px/1.5 Inter; color:{{ v.muted }}">parameters not supplied in brief</div>
+                  </div>
+                  <div style="display:flex; flex-direction:column; justify-content:space-between">
+                    <div>
+                      <div style="font:500 11px/1.2 Inter; letter-spacing:.07em; color:{{ v.muted }}; margin-bottom:6px">WIN RATE</div>
+                      <div style="font:500 20px/1.2 {{ v.num }}; font-variant-numeric:tabular-nums; color:{{ r.evidence }}">{{ r.win }}</div>
+                      <div style="font:400 13px/1.3 Inter; color:#9A94A6; margin-top:3px">{{ r.winNote }}</div>
+                    </div>
+                    <a href="#" onClick="{{ r.stop }}" style="font:500 13px/1.2 Inter; color:#4A3689; background:{{ v.accentSurface }}; border:1px solid #C9BCEB; border-radius:4px; padding:8px 10px; text-align:center; text-decoration:none">Open detail →</a>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+
+          <div style="display:flex; align-items:center; gap:8px; margin-top:14px; font:400 13px/1.3 Inter; color:{{ v.muted }}">
+            <span style="width:7px; height:7px; border-radius:50%; background:#9A94A6"></span><span>Open positions — none · all executors idle</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+</section>
+
+
+</x-dc>
+<script type="text/dc-js" data-dc-script data-props="{&quot;showDrift&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;States&quot;},&quot;dimLowConfidence&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;States&quot;},&quot;cubeSize&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:86,&quot;min&quot;:20,&quot;max&quot;:156,&quot;step&quot;:2,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;cubeShiftX&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:0,&quot;min&quot;:-60,&quot;max&quot;:60,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;crossTop&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:7,&quot;min&quot;:0,&quot;max&quot;:72,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hairline cross&quot;},&quot;crossArm&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:126,&quot;min&quot;:20,&quot;max&quot;:300,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hairline cross&quot;},&quot;crossArmLeft&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:108,&quot;min&quot;:20,&quot;max&quot;:200,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hairline cross&quot;},&quot;crossStub&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:25,&quot;min&quot;:0,&quot;max&quot;:40,&quot;step&quot;:1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hairline cross&quot;},&quot;crossX&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:71,&quot;min&quot;:40,&quot;max&quot;:95,&quot;step&quot;:1,&quot;unit&quot;:&quot;%&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Hairline cross&quot;}}">
+class Component extends DCLogic {
+  state = { open: {}, env: 'prod' };
+
+  setEnv(e) { this.setState({ env: e }); }
+  toggle(key) { this.setState(s => ({ open: { ...s.open, [key]: !s.open[key] } })); }
+
+  chart() {
+    const cw = [0,0.42,0,0,-0.18,0.35,0,0,0.61,-0.22,0,0.28,0,0,-0.31,0.44,0,0.19,0,0,0.52,-0.27,0.90,0.75];
+    const jit = [1,.72,1,1,.55,.81,1,1,.64,.9,1,.77,1,1,.6,.86,1,.7,1,1,.75,.95,.68,.8];
+    const cum = a => a.reduce((acc, v) => (acc.push((acc[acc.length-1]||0) + v), acc), []);
+    const cwC = cum(cw);
+    let ewC = cum(cw.map((v,i) => v * jit[i]));
+    const k = 2.60 / ewC[ewC.length-1];
+    ewC = ewC.map(v => v * k);
+    const W = 1060, H = 168, padT = 10;
+    const xs = cwC.map((_, i) => (i + 2 * Math.floor(i / 5)));
+    const xMax = xs[xs.length-1];
+    const all = cwC.concat(ewC);
+    const lo = Math.min(0, ...all), hi = Math.max(...all);
+    const X = i => (xs[i] / xMax) * W;
+    const Y = v => padT + (hi - v) / (hi - lo) * (H - padT);
+    const pts = arr => arr.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
+    const dots = cwC.map((v, i) => {
+      const carried = i === 18;
+      return { x: X(i).toFixed(1), y: Y(v).toFixed(1), r: carried ? 3.2 : 2.4,
+        fill: carried ? 'none' : 'currentColor', stroke: carried ? 'currentColor' : 'none' };
+    });
+    return { cw: pts(cwC), ew: pts(ewC), dots, zeroY: Y(0).toFixed(1), x0: '0', x1: W };
+  }
+
+  tokenRows(dir) {
+    const T = { ink: '#1E2029', flat: '#9A94A6', gain: '#0E8A5F', loss: '#C33A4C' };
+    const dim = this.props.dimLowConfidence ?? true;
+    const src = [
+      { id: 'hood', title: 'gap-fade v3 · HOOD', alloc: '$2,400', deployed: '—', trades: '31',
+        pnl: '+$187.42', gain: true, n: 31, win: '58%', winNote: 'over 31 closed',
+        note: 'intraday · does not trade every day', carried: false,
+        slot: 'daily marks · ~80% flat days', tradesSlot: '31 closed trades — most recent 5' },
+      { id: 'snow', title: 'gap-fade v3 · SNOW', alloc: '$2,400', deployed: '—', trades: '12',
+        pnl: '−$43.10', gain: false, n: 12, win: '—', winNote: 'not derived below n=30',
+        note: 'intraday · 1 mark carried', carried: true,
+        slot: 'daily marks · 1 carried mark', tradesSlot: '12 closed trades — most recent 5' },
+      { id: 'nvda', title: 'mean-reversion v2 · NVDA', alloc: '—', deployed: '—', trades: '6',
+        pnl: '+$22.90', gain: true, n: 6, win: '—', winNote: 'not derived below n=30',
+        note: 'paper · multi-day holds', carried: false,
+        slot: 'equity curve · continuous', tradesSlot: '6 closed trades — all shown' }
+    ];
+    return src.map(r => {
+      const key = dir + '-' + r.id;
+      const open = !!this.state.open[key];
+      const weak = dim && r.n < 30;
+      return { ...r,
+        pnlColor: r.gain ? T.gain : T.loss,
+        evidence: weak ? T.flat : T.ink,
+        nNote: 'n=' + r.n + (r.n >= 30 ? '' : ' · weak'),
+        mark: r.carried ? '◦' : '',
+        open, caret: open ? '−' : '+',
+        toggle: () => this.toggle(key),
+        stop: e => e.stopPropagation() };
+    });
+  }
+
+  renderVals() {
+    const dim = { panel: '#DCDDE7', rail: '#D1D3E0', frame: '#C0C3D4', hair: '#C6C8D7',
+      ink: '#1E2029', muted: '#565B6B', hover: '#E2E7CD', accentSurface: '#CDCBE4', rule: '#A6A9BC',
+      raised: '#E5E6EE' };
+    const variants = [
+      { key: '3c', badge: '3C', name: 'Dim surface', desc: 'periwinkle neutrals · mono figures',
+        num: "'JetBrains Mono', monospace", ...dim, rows: this.tokenRows('3c') }
+    ];
+    const dev = this.state.env === 'dev';
+    const navT = ['Fleet', 'Trades', 'Architecture', 'About'].map(n => ({
+      label: n,
+      color: n === 'Fleet' ? '#4A3689' : '#565B6B',
+      bg: n === 'Fleet' ? '#CDCBE4' : 'transparent' }));
+    const arm = this.props.crossArm ?? 86, stub = this.props.crossStub ?? 23, cx = this.props.crossX ?? 71;
+    const top = this.props.crossTop ?? 16;
+    // clamp the cube to the space left of the vertical hairline (188px rail, 9px gutter)
+    const avail = Math.max(0, 188 * cx / 100 - 9);
+    const cubeH = Math.max(0, Math.min(this.props.cubeSize ?? 78, Math.round(avail * 78 / 66)));
+    const left = this.props.crossArmLeft ?? arm;
+    const cross = { x: cx + '%', total: (arm + stub) + 'px', hTotal: (left + stub) + 'px',
+      offset: '-' + left + 'px', armTop: arm + 'px',
+      logoBottom: (stub + 4) + 'px', cubeBottom: (stub + 34) + 'px',
+      cubeH: cubeH, cubeW: Math.round(cubeH * 66 / 78),
+      cubeShift: 'translateX(' + (this.props.cubeShiftX ?? 0) + 'px)', rightGap: (100 - cx) + '%',
+      top: top + 'px', headerH: (top + arm) + 'px' };
+
+    return { cross, variants, navT, chart: this.chart(),
+      devT: { bg: dev ? '#CDCBE4' : 'transparent', color: dev ? '#4A3689' : '#565B6B' },
+      prodT: { bg: dev ? 'transparent' : '#6B4FBB', color: dev ? '#565B6B' : '#FFFFFF' },
+      setDev: () => this.setEnv('dev'), setProd: () => this.setEnv('prod'),
+      drift: this.props.showDrift ?? false };
+  }
+}
+</script>
+</body>
+</html>
