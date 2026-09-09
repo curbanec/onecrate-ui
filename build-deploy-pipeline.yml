@@ -13,8 +13,9 @@
 # Requires, in Azure DevOps:
 #   - Service connection 'ACR-TradingShared'        (Docker registry)
 #   - Service connection 'Azure-ServiceConnection'  (ARM)
-#   - Variable group 'onecrate-ui-variables', supplying BETTER_AUTH_SECRET and
-#     AUTH_DB_PASSWORD as *secret* variables.
+#   - Variable group 'trading-prod-variables', supplying BETTER_AUTH_SECRET and
+#     AUTH_DB_PASSWORD as *secret* variables. Shared with the trading pipelines
+#     (promote, function-deploy); this app reads only those two keys from it.
 # =============================================================================
 
 trigger: none
@@ -28,7 +29,7 @@ variables:
   # is single-quoted it reaches Bicep as the literal string "$(VAR)" with no
   # error, so a deploy can "succeed" with garbage parameter values. The guards in
   # the deploy step exist because of that failure mode.
-  - group: onecrate-ui-variables
+  - group: trading-prod-variables
   - name: imageName
     value: 'onecrate-ui'
   # One shared registry for both the executors and this app. The 'dev' in the
@@ -139,7 +140,7 @@ stages:
                 for var in BETTER_AUTH_SECRET AUTH_DB_PASSWORD; do
                   value="${!var:-}"
                   if [ -z "$value" ] || [[ "$value" == '$('* ]]; then
-                    echo "##vso[task.logissue type=error]$var is not set in variable group onecrate-ui-variables."
+                    echo "##vso[task.logissue type=error]$var is not set in variable group trading-prod-variables."
                     exit 1
                   fi
                 done
