@@ -26,22 +26,23 @@ param minReplicas = 1
 param maxReplicas = 3
 
 /**
- * EMPTY ON THE FIRST DEPLOY.
+ * Both hostnames are bound and serving. Keep this list matching what is
+ * actually live: the ingress custom-domain list is built from it declaratively,
+ * so emptying it or removing an entry UNBINDS that hostname on the next deploy.
  *
- * A managed certificate cannot be issued until DNS points at this app, and DNS
- * cannot point at it until it exists and has an FQDN. So: deploy once with this
- * empty, create the Wix records from the `fqdn` and `staticIp` outputs, then
- * uncomment and deploy again. Full sequence in README.md §3–5.
+ * It was empty for the first deploy only, because of the chicken-and-egg: a
+ * managed certificate cannot be issued until DNS points at this app, and DNS
+ * cannot point at it until it exists and has an FQDN. Full sequence in
+ * README.md §3–5.
  *
  * Validation method differs by record shape — www is a CNAME so it validates by
  * CNAME; the apex is a pinned A record (Wix will not delegate nameservers, so no
  * flattening at the apex) which leaves TXT validation via the asuid record.
  */
-param customDomains = []
-// param customDomains = [
-//   { hostname: 'www.onecrate.io', validation: 'CNAME' }
-//   { hostname: 'onecrate.io', validation: 'TXT' }
-// ]
+param customDomains = [
+  { hostname: 'www.onecrate.io', validation: 'CNAME' }
+  { hostname: 'onecrate.io', validation: 'TXT' }
+]
 
 // Supplied by the pipeline — declared here so the file type-checks against the
 // template. Never put real secrets in this file; it is committed.
