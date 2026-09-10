@@ -25,26 +25,6 @@ param authDbUser = 'onecrate_app'
 param minReplicas = 1
 param maxReplicas = 3
 
-/**
- * Both hostnames are bound and serving. Keep this list matching what is
- * actually live: the ingress custom-domain list is built from it declaratively,
- * so emptying it or removing an entry UNBINDS that hostname on the next deploy.
- *
- * It was empty for the first deploy only, because of the chicken-and-egg: a
- * managed certificate cannot be issued until DNS points at this app, and DNS
- * cannot point at it until it exists and has an FQDN. Full sequence in
- * README.md §3–5.
- *
- * Validation method differs by record shape — www is a CNAME so it validates by
- * CNAME; the apex is a pinned A record (Wix will not delegate nameservers, so no
- * flattening at the apex) which leaves TXT validation via the asuid record.
- *
- * certificateName adopts the certificate that already exists for that subject.
- * An environment allows only one managed certificate per subject name, so
- * without this the deploy fails with DuplicateManagedCertificateInEnvironment.
- * The names carry a creation timestamp because the portal issued them; a
- * certificate this template creates is named after its hostname instead.
- */
 param customDomains = [
   {
     hostname: 'www.onecrate.io'
