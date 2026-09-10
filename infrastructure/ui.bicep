@@ -40,7 +40,7 @@ param authDbUser string
 @secure()
 param authDbPassword string
 
-@description('Hostnames to bind, each as { hostname: string, validation: \'CNAME\' | \'TXT\' | \'HTTP\' }. Leave EMPTY on the first deployment — a managed certificate cannot be issued until DNS points at this app, and DNS cannot point at it until it exists and has an FQDN. See README.md.')
+@description('Hostnames to bind, each as { hostname: string, validation: \'CNAME\' | \'TXT\' | \'HTTP\', certificateName: string? }. Supply certificateName to adopt a managed certificate that already exists for that subject; omit it to have this template create one. Leave the whole array EMPTY on the first deployment — a certificate cannot be issued until DNS points at this app, and DNS cannot point at it until it exists and has an FQDN. See README.md.')
 param customDomains array = []
 
 @description('CPU cores per replica')
@@ -69,13 +69,20 @@ resource environment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
  * Managed certificates, one per hostname. Free, auto-renewing, issued by Azure
  * once domain ownership validates.
  *
+ * An environment permits only ONE managed certificate per subject name, so a
+ * hostname whose certificate already exists must be adopted rather than
+ * reissued — creating a second one fails the whole deployment with
+ * DuplicateManagedCertificateInEnvironment. Give such a domain a
+ * `certificateName` and this template binds the existing certificate instead of
+ * creating one.
+ *
  * Validation method is per-domain because the record shapes differ: www is a
  * CNAME at the container app FQDN, so CNAME validation works. The apex cannot be
  * a CNAME (Wix will not delegate nameservers, so no flattening) and is a pinned
  * A record, which leaves TXT validation via the asuid record.
  */
-resource certificates 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = [
-  for domain in customDomains: {
+resource createdCertificates 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' = [
+  for domain in customDomains: if (!contains(domain, 'certificateName')) {
     name: replace(domain.hostname, '.', '-')
     parent: environment
     location: location
@@ -86,9 +93,29 @@ resource certificates 'Microsoft.App/managedEnvironments/managedCertificates@202
   }
 ]
 
+/**
+ * The binding references certificates by resource ID, and an ID is just a
+ * constructed string — identical whether this deploy created the certificate or
+ * an earlier one did. Referencing them all through this `existing` array means
+ * the two cases share one code path; `dependsOn` on the container app supplies
+ * the ordering that the direct reference used to imply.
+ */
+resource certificates 'Microsoft.App/managedEnvironments/managedCertificates@2024-03-01' existing = [
+  for domain in customDomains: {
+    name: contains(domain, 'certificateName')
+      ? domain.certificateName
+      : replace(domain.hostname, '.', '-')
+    parent: environment
+  }
+]
+
 resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
   location: location
+  // The ingress binding reads certificate IDs off the `existing` array, which
+  // constructs strings and so implies no ordering. Any certificate this deploy
+  // creates must still exist before the binding is attempted.
+  dependsOn: [createdCertificates]
   properties: {
     managedEnvironmentId: environment.id
     configuration: {

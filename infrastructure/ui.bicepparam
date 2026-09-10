@@ -38,10 +38,24 @@ param maxReplicas = 3
  * Validation method differs by record shape — www is a CNAME so it validates by
  * CNAME; the apex is a pinned A record (Wix will not delegate nameservers, so no
  * flattening at the apex) which leaves TXT validation via the asuid record.
+ *
+ * certificateName adopts the certificate that already exists for that subject.
+ * An environment allows only one managed certificate per subject name, so
+ * without this the deploy fails with DuplicateManagedCertificateInEnvironment.
+ * The names carry a creation timestamp because the portal issued them; a
+ * certificate this template creates is named after its hostname instead.
  */
 param customDomains = [
-  { hostname: 'www.onecrate.io', validation: 'CNAME' }
-  { hostname: 'onecrate.io', validation: 'TXT' }
+  {
+    hostname: 'www.onecrate.io'
+    validation: 'CNAME'
+    certificateName: 'www.onecrate.io-trading--260910171410'
+  }
+  {
+    hostname: 'onecrate.io'
+    validation: 'TXT'
+    certificateName: 'onecrate.io-trading--260910202327'
+  }
 ]
 
 // Supplied by the pipeline — declared here so the file type-checks against the
