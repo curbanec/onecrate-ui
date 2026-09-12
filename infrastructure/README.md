@@ -63,8 +63,9 @@ npm run auth:migrate              # creates user/session/account/organization/me
 npm run seed:operator             # SEED_EMAIL / SEED_PASSWORD in the environment
 ```
 
-`auth:migrate` is Better Auth's CLI. Run `npm run auth:generate` first if you
-want to inspect the SQL before it is applied.
+`auth:migrate` runs `scripts/migrate-auth.ts`, not Better Auth's CLI — the CLI
+cannot load `src/lib/auth.ts` (it trips on `server-only`) and is not published
+past 1.4. Run `npm run auth:generate` first to print the SQL without applying it.
 
 **Also set "Allow Azure services and resources to access this server"** on the
 SQL server firewall. Without it the container starts, passes its health probe,

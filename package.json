@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "auth:generate": "npx @better-auth/cli generate --config src/lib/auth.ts",
-    "auth:migrate": "npx @better-auth/cli migrate --config src/lib/auth.ts",
+    "auth:generate": "tsx --env-file=.env.local scripts/migrate-auth.ts --dry-run",
+    "auth:migrate": "tsx --env-file=.env.local scripts/migrate-auth.ts",
     "seed:operator": "tsx --env-file=.env.local scripts/seed-operator.ts"
   },
   "dependencies": {

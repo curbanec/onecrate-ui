@@ -166,7 +166,7 @@ The organization is created via `createOrganization` in system-action mode
 (passing `userId` with no session), which is public API.
 
 ```bash
-npm run auth:migrate    # create tables (Better Auth CLI)
+npm run auth:migrate    # create tables (scripts/migrate-auth.ts)
 npm run seed:operator   # SEED_EMAIL / SEED_PASSWORD from the environment
 ```
 
@@ -191,6 +191,7 @@ difference tells an attacker which addresses are real accounts.
 | `src/app/actions/auth.ts` | `login` / `logout` Server Actions. |
 | `src/app/api/auth/[...all]/route.ts` | Better Auth handler mount. |
 | `src/app/login/` | Login page + client form. |
+| `scripts/migrate-auth.ts` | Auth schema migrations. Replaces the Better Auth CLI, which cannot load `lib/auth.ts` (`server-only` does not resolve outside Next) and is not published past 1.4. |
 | `scripts/seed-operator.ts` | Account and organization provisioning. |
 
 ---
