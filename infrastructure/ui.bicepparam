@@ -15,10 +15,9 @@ param containerAppEnvironmentName = 'trading-prod-env'
 // everyone out.
 param appOrigin = 'https://www.onecrate.io'
 
-// TODO: fill in once the auth database exists. The SQL server is not in Bicep —
-// it predates this repo and is passed to the executors as a connection string,
-// so find its name in the portal. See README.md §1.
-param authDbServer = 'REPLACE-ME.database.windows.net'
+// The one SQL server, shared with the executors. Not in Bicep — it predates this
+// repo. Auth lives in its own database on it, apart from the trade data.
+param authDbServer = 'trading-sql.database.windows.net'
 param authDbName = 'onecrate-auth'
 param authDbUser = 'onecrate_app'
 
