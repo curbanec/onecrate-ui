@@ -1,6 +1,11 @@
 import { Figure, HatchedSlot, Label, Note } from "@/components/primitives";
 import { derivedNote, withhold, type Executor } from "@/lib/fleet";
 
+/** Trade exit date, reduced to the day. */
+function day(iso: string | null): string {
+  return iso === null ? "—" : iso.slice(0, 10);
+}
+
 export function ExecutorDetail({
   executor,
   id,
@@ -20,12 +25,48 @@ export function ExecutorDetail({
     >
       <div>
         <Label className="mb-1.5">recent trades</Label>
-        <HatchedSlot variant="block">{executor.tradesNote}</HatchedSlot>
+        {executor.recentTrades.length === 0 ? (
+          <HatchedSlot variant="block">{executor.tradesNote}</HatchedSlot>
+        ) : (
+          <div className="text-data-sm font-numeric flex flex-col gap-1 tabular-nums">
+            {executor.recentTrades.map((trade) => (
+              <div key={trade.id} className="flex items-baseline justify-between gap-3">
+                <span className="text-muted">{day(trade.exitDate)}</span>
+                <span className="text-ink flex-1 truncate">
+                  {trade.symbol ?? "—"}
+                  {trade.side ? ` ${trade.side}` : ""}
+                </span>
+                <Figure
+                  value={trade.pnl}
+                  tone="direction"
+                  size="sm"
+                  format="currency"
+                  signed
+                />
+              </div>
+            ))}
+            <Note className="mt-0.5">{executor.tradesNote}</Note>
+          </div>
+        )}
       </div>
 
       <div>
         <Label className="mb-1.5">parameter set</Label>
-        <HatchedSlot variant="block">parameters not supplied in brief</HatchedSlot>
+        {executor.parameters.length === 0 ? (
+          <HatchedSlot variant="block">no parameters in the manifest</HatchedSlot>
+        ) : (
+          <div className="text-data-sm font-numeric grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
+            {executor.parameters.map((parameter) => (
+              <div
+                key={parameter.label}
+                className="flex items-baseline justify-between gap-2"
+              >
+                <span className="text-muted truncate">{parameter.label}</span>
+                <span className="text-ink">{parameter.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col justify-between">
@@ -46,7 +87,7 @@ export function ExecutorDetail({
         </div>
 
         <a
-          href={`/executors/${executor.id}`}
+          href={executor.href}
           onClick={onNavigate}
           className="text-note border-accent-line bg-accent-surface text-accent-ink rounded-control border px-[10px] py-2 text-center font-medium no-underline"
         >

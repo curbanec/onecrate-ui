@@ -1,14 +1,16 @@
 /**
- * Fleet data model and fixture.
+ * Fleet view model — the prop shapes the Fleet components consume.
  *
- * Ported from the canvas mockup's tokenRows()/chart() in
- * `docs/Fleet Directions.dc.html`. Two deliberate changes from the mockup:
+ * This file used to carry a fixture as well. The fixture is gone: the page now
+ * renders live platform data, and leaving plausible-looking fake figures next to
+ * real ones in the same module is exactly how a mock gets rendered as fact.
+ * `lib/fleet-view.ts` builds these shapes from the data layer.
  *
- *  1. Figures are numbers, not preformatted strings. Formatting is a rendering
- *     concern and belongs in <Figure>.
- *  2. Platform totals and the chart's endpoint percentages are *derived* from
- *     the rows and deltas below rather than stored alongside them, so the
- *     header can never disagree with the table it summarizes.
+ * Two fields widened from the fixture's types, because real data has absences
+ * the fixture never did — see the Stage 4 report:
+ *
+ *   - Executor.cumulativePnl      null until an executor has a snapshot row
+ *   - FleetSummary returns        null when the platform aggregate has no answer
  */
 
 import { EVIDENCE_THRESHOLD } from "./design";
@@ -23,18 +25,42 @@ export type StrategyCharacter = "intraday" | "continuous" | "pairs";
 /** §2.5. Reuses gain/flat/loss rather than introducing new colors. */
 export type ExecutorState = "open" | "idle" | "halted";
 
+/** One flattened parameter line for the expanded card. */
+export interface ParameterLine {
+  label: string;
+  value: string;
+}
+
+/** A closed trade, reduced to what the expanded card shows. */
+export interface RecentTrade {
+  id: string;
+  symbol: string | null;
+  side: string | null;
+  /** ISO timestamp, or null while still open. */
+  exitDate: string | null;
+  pnl: number | null;
+}
+
 export interface Executor {
   id: string;
   /** Identifier as displayed, e.g. "gap-fade v3 · HOOD" (§7). */
   title: string;
   /** Row subtitle — strategy character in one lowercase clause (§7). */
   note: string;
+  /** Detail route. Built by executorHref() so the URL shape lives in one place. */
+  href: string;
   state: ExecutorState;
   character: StrategyCharacter;
   /** null renders as an em dash in `flat`, never as zero (§6.7). */
   allocated: number | null;
   deployed: number | null;
-  cumulativePnl: number;
+  /**
+   * Since inception, from the executor's latest snapshot row. Null when it has
+   * no snapshot rows yet — a newly deployed executor has no P&L, which is not
+   * the same as zero P&L.
+   */
+  cumulativePnl: number | null;
+  /** Closed trades over the executor's whole history. A real count; 0 is honest. */
   closedTrades: number;
   /**
    * Raw win rate in percent units (58 → "58%"), or null when no source
@@ -44,9 +70,15 @@ export interface Executor {
   winRate: number | null;
   /** Most recent mark is carried forward from a previous close (§6.3). */
   carriedMark: boolean;
-  /** Label for the hatched placeholder standing in for real series data. */
+  /** Label describing the signal series, shown when there is nothing to plot. */
   signalNote: string;
   tradesNote: string;
+  /** Daily marks for the signal slot. Empty when the executor has no history. */
+  marks: Mark[];
+  /** Most recent closed trades, newest first. */
+  recentTrades: RecentTrade[];
+  /** Deployed parameter set, flattened. Empty when the manifest carried none. */
+  parameters: ParameterLine[];
 }
 
 /** A single daily mark. */
@@ -82,7 +114,7 @@ export interface FleetSeries {
   to: string;
   /**
    * Honest description of what the reader is looking at. Carried as data
-   * because it stops being true the moment a real series lands.
+   * because it stops being true the moment the underlying series changes.
    */
   provenance: string;
 }
@@ -120,145 +152,7 @@ export function derivedNote(sampleSize: number): string {
     : WITHHELD_NOTE;
 }
 
-/* ── Fixture ──────────────────────────────────────────────────────────────── */
-
-export const executors: Executor[] = [
-  {
-    id: "hood",
-    title: "gap-fade v3 · HOOD",
-    note: "intraday · does not trade every day",
-    state: "idle",
-    character: "intraday",
-    allocated: 2400,
-    deployed: null,
-    cumulativePnl: 187.42,
-    closedTrades: 31,
-    winRate: 58,
-    carriedMark: false,
-    signalNote: "daily marks · ~80% flat days",
-    tradesNote: "31 closed trades — most recent 5",
-  },
-  {
-    id: "snow",
-    title: "gap-fade v3 · SNOW",
-    note: "intraday · 1 mark carried",
-    state: "idle",
-    character: "intraday",
-    allocated: 2400,
-    deployed: null,
-    cumulativePnl: -43.1,
-    closedTrades: 12,
-    winRate: null,
-    carriedMark: true,
-    signalNote: "daily marks · 1 carried mark",
-    tradesNote: "12 closed trades — most recent 5",
-  },
-  {
-    id: "nvda",
-    title: "mean-reversion v2 · NVDA",
-    note: "paper · multi-day holds",
-    state: "idle",
-    character: "continuous",
-    allocated: null,
-    deployed: null,
-    cumulativePnl: 22.9,
-    closedTrades: 6,
-    winRate: null,
-    carriedMark: false,
-    signalNote: "equity curve · continuous",
-    tradesNote: "6 closed trades — all shown",
-  },
-];
-
-/**
- * Daily deltas, percent. The curve shape is illustrative; the endpoints are
- * real — capital-weighted sums to +3.48% and equal-weighted is scaled to the
- * observed +2.60%.
- */
-const CAPITAL_WEIGHTED_DELTAS = [
-  0, 0.42, 0, 0, -0.18, 0.35, 0, 0, 0.61, -0.22, 0, 0.28,
-  0, 0, -0.31, 0.44, 0, 0.19, 0, 0, 0.52, -0.27, 0.9, 0.75,
-];
-
-/** Per-day damping that turns the capital-weighted path into the average one. */
-const EQUAL_WEIGHTED_DAMPING = [
-  1, 0.72, 1, 1, 0.55, 0.81, 1, 1, 0.64, 0.9, 1, 0.77,
-  1, 1, 0.6, 0.86, 1, 0.7, 1, 1, 0.75, 0.95, 0.68, 0.8,
-];
-
-/** Observed equal-weighted return the damped path is scaled to hit, percent. */
-const EQUAL_WEIGHTED_TOTAL = 2.6;
-
-/** Index of the one mark carried forward rather than observed live. */
-const CARRIED_MARK_INDEX = 18;
-
-/** First mark. Weekday, so the series starts on a session. */
-const SERIES_START = "2026-07-20";
-
-/**
- * `count` consecutive trading days from `start`, skipping weekends.
- *
- * Market holidays are not modelled — a real calendar would drop those too, and
- * the chart needs no change when it does, because the gap comes from the dates
- * themselves rather than from anything the renderer assumes.
- */
-function tradingDays(start: string, count: number): string[] {
-  const days: string[] = [];
-  const cursor = new Date(`${start}T00:00:00Z`);
-
-  while (days.length < count) {
-    const weekday = cursor.getUTCDay();
-    if (weekday !== 0 && weekday !== 6) days.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-
-  return days;
-}
-
-function cumulative(deltas: number[]): number[] {
-  let running = 0;
-  return deltas.map((delta) => (running += delta));
-}
-
-function buildSeries(): FleetSeries {
-  const cw = cumulative(CAPITAL_WEIGHTED_DELTAS);
-  const damped = cumulative(
-    CAPITAL_WEIGHTED_DELTAS.map((delta, i) => delta * EQUAL_WEIGHTED_DAMPING[i]),
-  );
-  const scale = EQUAL_WEIGHTED_TOTAL / damped[damped.length - 1];
-  const ew = damped.map((v) => v * scale);
-
-  const dates = tradingDays(SERIES_START, cw.length);
-
-  const toMarks = (values: number[]): Mark[] =>
-    values.map((value, i) => ({
-      date: dates[i],
-      t: Date.parse(dates[i]),
-      value,
-      carried: i === CARRIED_MARK_INDEX,
-    }));
-
-  const rows: ChartRow[] = dates.map((date, i) => ({
-    t: Date.parse(date),
-    date,
-    capitalWeighted: cw[i],
-    equalWeighted: ew[i],
-    carried: i === CARRIED_MARK_INDEX,
-  }));
-
-  return {
-    capitalWeighted: toMarks(cw),
-    equalWeighted: toMarks(ew),
-    rows,
-    from: dates[0],
-    to: dates[dates.length - 1],
-    provenance: `curve shape illustrative · endpoints derived from sample data · ${cw.length} daily marks, gaps preserved`,
-  };
-}
-
-export const series: FleetSeries = buildSeries();
-
-/* ── Derived platform summary (§5.3, §6.4) ────────────────────────────────── */
+/* ── Platform summary (§5.3, §6.4) ────────────────────────────────────────── */
 
 export interface CarriedMarks {
   count: number;
@@ -272,42 +166,32 @@ export interface FleetSummary {
   carried: CarriedMarks;
   executorCount: number;
   allocated: number;
-  cumulativePnl: number;
+  /** Null when no executor has a snapshot row yet. */
+  cumulativePnl: number | null;
   closedTrades: number;
-  /** Endpoint of each series, percent. */
-  capitalWeightedReturn: number;
-  equalWeightedReturn: number;
+  /** Endpoint of each series, percent. Null when the aggregate has no answer. */
+  capitalWeightedReturn: number | null;
+  equalWeightedReturn: number | null;
   /** Invisible when zero, impossible to ignore when not (§6.5). */
   drift: boolean;
   openPositions: number;
 }
 
-function endpoint(marks: Mark[]): number {
-  return marks.length === 0 ? 0 : marks[marks.length - 1].value;
-}
-
-export function summarize(
-  rows: Executor[] = executors,
-  marks: FleetSeries = series,
-): FleetSummary {
-  const carried = rows.filter((r) => r.carriedMark);
-
-  return {
-    asOf: null,
-    carried: { count: carried.length, titles: carried.map((r) => r.title) },
-    executorCount: rows.length,
-    allocated: rows.reduce((sum, r) => sum + (r.allocated ?? 0), 0),
-    cumulativePnl: rows.reduce((sum, r) => sum + r.cumulativePnl, 0),
-    closedTrades: rows.reduce((sum, r) => sum + r.closedTrades, 0),
-    capitalWeightedReturn: endpoint(marks.capitalWeighted),
-    equalWeightedReturn: endpoint(marks.equalWeighted),
-    drift: false,
-    openPositions: rows.filter((r) => r.state === "open").length,
-  };
-}
-
-export const summary: FleetSummary = summarize();
-
 /** Rail navigation (§5.1). */
 export const NAV_ITEMS = ["Fleet", "Trades", "Architecture", "About"] as const;
 export type NavItem = (typeof NAV_ITEMS)[number];
+
+/**
+ * Route for a nav item.
+ *
+ * One mapping, because two things now depend on it: the rail's own links and
+ * the environment toggle, which rewrites the *current* route's query string.
+ * A second copy would let the toggle send you somewhere the nav doesn't.
+ *
+ * Note Fleet maps to `/fleet`, not `/`. It previously mapped to `/`, which is
+ * the splash page — so the rail's Fleet link led away from the app. Harmless
+ * while nothing depended on it; wrong the moment the toggle builds a URL from it.
+ */
+export function navHref(item: NavItem): string {
+  return `/${item.toLowerCase()}`;
+}

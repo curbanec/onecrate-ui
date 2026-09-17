@@ -40,6 +40,14 @@ param authDbUser string
 @secure()
 param authDbPassword string
 
+@description('Trade data connection string, ADO.NET form. The SAME value the trading platform uses (TRADE_TRACKER_DB_CONNECTION_STRING), so it copies verbatim from the shared variable group rather than becoming a second credential to rotate. Read-only use: this app never writes to a platform table.')
+@secure()
+param tradeTrackerDbConnectionString string
+
+@description('Storage account connection string holding the deployment manifests (container `deployments`, blobs deployed.dev.json / deployed.prod.json). Both manifests currently live in one account, so a single value covers both environments; the app also honours STORAGE_CONNECTION_STRING_DEV / _PROD if they ever diverge.')
+@secure()
+param storageConnectionString string
+
 @description('Hostnames to bind, each as { hostname: string, validation: \'CNAME\' | \'TXT\' | \'HTTP\', certificateName: string? }. Supply certificateName to adopt a managed certificate that already exists for that subject; omit it to have this template create one. Leave the whole array EMPTY on the first deployment — a certificate cannot be issued until DNS points at this app, and DNS cannot point at it until it exists and has an FQDN. See README.md.')
 param customDomains array = []
 
@@ -59,6 +67,8 @@ var secretNames = {
   acr: 'acr-password'
   authSecret: 'better-auth-secret'
   dbPassword: 'auth-db-password'
+  tradingDb: 'trade-tracker-db-connection-string'
+  storage: 'storage-connection-string'
 }
 
 resource environment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
@@ -132,6 +142,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: secretNames.dbPassword
           value: authDbPassword
         }
+        {
+          name: secretNames.tradingDb
+          value: tradeTrackerDbConnectionString
+        }
+        {
+          name: secretNames.storage
+          value: storageConnectionString
+        }
       ]
       registries: [
         {
@@ -195,6 +213,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AUTH_DB_PASSWORD'
               secretRef: secretNames.dbPassword
+            }
+            {
+              name: 'TRADE_TRACKER_DB_CONNECTION_STRING'
+              secretRef: secretNames.tradingDb
+            }
+            {
+              name: 'STORAGE_CONNECTION_STRING'
+              secretRef: secretNames.storage
             }
           ]
           probes: [

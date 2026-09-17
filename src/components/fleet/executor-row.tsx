@@ -28,7 +28,7 @@ export function ExecutorRow({
       >
         <div>
           <a
-            href={`/executors/${executor.id}`}
+            href={executor.href}
             onClick={stop}
             className="font-numeric text-data decoration-accent-line text-accent font-medium underline underline-offset-[3px]"
           >

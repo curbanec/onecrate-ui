@@ -15,6 +15,11 @@ const REQUIRED = [
   "AUTH_DB_NAME",
   "AUTH_DB_USER",
   "AUTH_DB_PASSWORD",
+  // Trade data and the deployment manifest. Without either, every page that
+  // matters renders nothing — better to refuse the container than to serve a
+  // Fleet page that cannot answer the one question it exists to answer.
+  "TRADE_TRACKER_DB_CONNECTION_STRING",
+  "STORAGE_CONNECTION_STRING",
 ] as const;
 
 export async function register() {

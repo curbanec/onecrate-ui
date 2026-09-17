@@ -1,28 +1,43 @@
-"use client";
+import Link from "next/link";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { DEPLOYMENT_ENVS, type DeploymentEnv } from "@/lib/data";
 
-export type Env = "prod" | "dev";
-
+/**
+ * PROD / DEV toggle (§5.1).
+ *
+ * Selects which trading environment you are *looking at*, not which deployment
+ * you are running. There is one deployment, to production; both datasets live
+ * in the same database, separated by a column.
+ *
+ * The URL is the source of truth. This used to hold `useState`, which meant the
+ * server could not know which environment to query and a screenshot could not
+ * record which one you were looking at. Now each side is a plain link to the
+ * same route with `?env=` set, and the page reads it back through
+ * `parseDeploymentEnv`.
+ *
+ * That also makes this a Server Component: no `use client`, no hydration, no
+ * Suspense boundary. The alternative — `useSearchParams` in a client component —
+ * would force client-side rendering up to the nearest boundary, which Next's own
+ * docs recommend avoiding when the value can be passed down instead.
+ *
+ * Known limitation: toggling rebuilds the query string from scratch, so any
+ * other search param on the route is dropped. Nothing sets one today. When
+ * something does (a Trades filter, say), this needs the full current query
+ * passed in rather than just the base path.
+ */
 export function EnvToggle({
-  value,
-  onChange,
+  env,
+  basePath,
   className,
 }: {
-  value?: Env;
-  onChange?: (env: Env) => void;
+  /** Environment currently being viewed. */
+  env: DeploymentEnv;
+  /** Route the toggle stays on, e.g. `/fleet`. */
+  basePath: string;
   className?: string;
 }) {
-  const [internal, setInternal] = useState<Env>("prod");
-  const env = value ?? internal;
-
-  const select = (next: Env) => {
-    if (value === undefined) setInternal(next);
-    onChange?.(next);
-  };
-
-  const tone = (target: Env) => {
+  const tone = (target: DeploymentEnv) => {
     if (env !== target) return "bg-transparent text-muted";
     return target === "prod"
       ? "bg-accent text-white"
@@ -38,19 +53,21 @@ export function EnvToggle({
         className,
       )}
     >
-      {(["prod", "dev"] as const).map((target) => (
-        <button
+      {DEPLOYMENT_ENVS.map((target) => (
+        <Link
           key={target}
-          type="button"
-          onClick={() => select(target)}
-          aria-pressed={env === target}
+          href={`${basePath}?env=${target}`}
+          aria-current={env === target ? "page" : undefined}
           className={cn(
-            "text-label flex-1 cursor-pointer border-0 py-1.5 uppercase",
+            // text-center and no-underline are doing real work here: a button
+            // centers its label and carries no underline by default, an anchor
+            // does neither.
+            "text-label flex-1 py-1.5 text-center uppercase no-underline",
             tone(target),
           )}
         >
           {target}
-        </button>
+        </Link>
       ))}
     </div>
   );
