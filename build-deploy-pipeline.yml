@@ -14,11 +14,15 @@
 #   - Service connection 'ACR-TradingShared'        (Docker registry)
 #   - Service connection 'Azure-ServiceConnection'  (ARM)
 #   - Variable group 'trading-prod-variables', supplying BETTER_AUTH_SECRET,
-#     AUTH_DB_PASSWORD, TRADE_TRACKER_DB_CONNECTION_STRING and
-#     STORAGE_CONNECTION_STRING as *secret* variables. Shared with the trading
-#     pipelines (promote, function-deploy), which define the latter two under
-#     these same names — the values copy verbatim rather than becoming a second
-#     credential to rotate.
+#     AUTH_DB_PASSWORD, DB_CONNECTION_STRING and STORAGE_CONNECTION_STRING as
+#     *secret* variables. Shared with the trading pipelines (promote,
+#     function-deploy), which define the latter two under these same names.
+#
+#     DB_CONNECTION_STRING is the group's name for the trade database. The
+#     container receives that value as TRADE_TRACKER_DB_CONNECTION_STRING, which
+#     is what this app and the trading platform's own code read from the
+#     environment. The two names are bridged in the parameter mapping below and
+#     nowhere else — do not rename the container variable to match the group.
 # =============================================================================
 
 trigger: none
@@ -27,12 +31,12 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # Supplies BETTER_AUTH_SECRET, AUTH_DB_PASSWORD,
-  # TRADE_TRACKER_DB_CONNECTION_STRING and STORAGE_CONNECTION_STRING. Without a
-  # group, an undefined $(VAR) macro survives into the script unsubstituted — and
-  # where it is single-quoted it reaches Bicep as the literal string "$(VAR)"
-  # with no error, so a deploy can "succeed" with garbage parameter values. The
-  # guards in the deploy step exist because of that failure mode.
+  # Supplies BETTER_AUTH_SECRET, AUTH_DB_PASSWORD, DB_CONNECTION_STRING and
+  # STORAGE_CONNECTION_STRING. Without a group, an undefined $(VAR) macro
+  # survives into the script unsubstituted — and where it is single-quoted it
+  # reaches Bicep as the literal string "$(VAR)" with no error, so a deploy can
+  # "succeed" with garbage parameter values. The guards in the deploy step exist
+  # because of that failure mode.
   - group: trading-prod-variables
   - name: imageName
     value: 'onecrate-ui'
@@ -154,7 +158,7 @@ stages:
                 # which surfaces as an opaque InvalidTemplateDeployment naming
                 # the resource provider rather than the variable that is missing.
                 for var in BETTER_AUTH_SECRET AUTH_DB_PASSWORD \
-                           TRADE_TRACKER_DB_CONNECTION_STRING \
+                           DB_CONNECTION_STRING \
                            STORAGE_CONNECTION_STRING; do
                   value="${!var:-}"
                   if [ -z "$value" ] || [[ "$value" == '$('* ]]; then
@@ -178,7 +182,7 @@ stages:
                   --parameters acrPassword="$ACR_PASSWORD" \
                   --parameters betterAuthSecret="$BETTER_AUTH_SECRET" \
                   --parameters authDbPassword="$AUTH_DB_PASSWORD" \
-                  --parameters tradeTrackerDbConnectionString="$TRADE_TRACKER_DB_CONNECTION_STRING" \
+                  --parameters tradeTrackerDbConnectionString="$DB_CONNECTION_STRING" \
                   --parameters storageConnectionString="$STORAGE_CONNECTION_STRING" \
                   --name "onecrate-ui-$(Build.BuildId)" \
                   --verbose
@@ -188,7 +192,7 @@ stages:
               # Secret variables are not auto-mapped into the script environment.
               BETTER_AUTH_SECRET: $(BETTER_AUTH_SECRET)
               AUTH_DB_PASSWORD: $(AUTH_DB_PASSWORD)
-              TRADE_TRACKER_DB_CONNECTION_STRING: $(TRADE_TRACKER_DB_CONNECTION_STRING)
+              DB_CONNECTION_STRING: $(DB_CONNECTION_STRING)
               STORAGE_CONNECTION_STRING: $(STORAGE_CONNECTION_STRING)
 
           - task: AzureCLI@2
