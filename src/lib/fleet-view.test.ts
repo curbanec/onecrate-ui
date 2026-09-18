@@ -142,6 +142,9 @@ function driftRow(over: Partial<DriftRow> = {}): DriftRow {
     allMarksComplete: true,
     unattributedDelta: 1.2552,
     unattributedFractionOfAllocated: 0.001569,
+    // $800 allocated → max($0.50, 25bp × 800) = $2.00, so 1.2552 is within it.
+    deltaThreshold: 2,
+    deltaExceedsThreshold: false,
     ...over,
   };
 }
@@ -258,36 +261,58 @@ describe("drift banner", () => {
     assert.equal(buildFleetView(input({ drift: [] })).summary.drift, false);
   });
 
-  test("hidden when the delta is null — unknown is not drift", () => {
+  test("hidden when the day did not reconcile — unknown is not drift", () => {
     const view = buildFleetView(
-      input({ drift: [driftRow({ unattributedDelta: null })] }),
+      input({
+        drift: [driftRow({ unattributedDelta: null, deltaExceedsThreshold: null })],
+      }),
     );
     assert.equal(view.summary.drift, false);
   });
 
   test("hidden when the delta is exactly zero — the books agree", () => {
-    const view = buildFleetView(input({ drift: [driftRow({ unattributedDelta: 0 })] }));
+    const view = buildFleetView(
+      input({ drift: [driftRow({ unattributedDelta: 0, deltaExceedsThreshold: false })] }),
+    );
     assert.equal(view.summary.drift, false);
   });
 
-  test("visible on the live delta", () => {
-    assert.equal(buildFleetView(input({ drift: [driftRow()] })).summary.drift, true);
+  test("hidden for a small delta under the threshold — same rule as the email alert", () => {
+    // A real settled residual from 2026-09-15. It is non-zero, and under the
+    // old any-amount rule the banner showed it; the email alert never would.
+    // Now both apply the view's threshold, so neither does.
+    const view = buildFleetView(
+      input({ drift: [driftRow({ unattributedDelta: 0.0171, deltaExceedsThreshold: false })] }),
+    );
+    assert.equal(view.summary.drift, false);
   });
 
-  test("visible for a small delta too — any disagreement counts", () => {
-    // Below the platform's $1.00 paging threshold, but the books still
-    // disagree, and the page's job is to say so.
+  test("visible when the view says the delta exceeds the threshold", () => {
     const view = buildFleetView(
-      input({ drift: [driftRow({ unattributedDelta: 0.02 })] }),
+      input({ drift: [driftRow({ unattributedDelta: 4.2, deltaExceedsThreshold: true })] }),
     );
     assert.equal(view.summary.drift, true);
   });
 
-  test("visible for a negative delta", () => {
+  test("visible for a negative delta beyond the threshold", () => {
     const view = buildFleetView(
-      input({ drift: [driftRow({ unattributedDelta: -3.5 })] }),
+      input({ drift: [driftRow({ unattributedDelta: -3.5, deltaExceedsThreshold: true })] }),
     );
     assert.equal(view.summary.drift, true);
+  });
+
+  test("follows the view's verdict, never the raw amount", () => {
+    // The UI must not re-derive the threshold — a second copy of the formula is
+    // how the banner and the email would drift apart. These rows deliberately
+    // pair an amount with the opposite verdict: the verdict wins both times.
+    const bigButWithin = buildFleetView(
+      input({ drift: [driftRow({ unattributedDelta: 4.2, deltaExceedsThreshold: false })] }),
+    );
+    const smallButOver = buildFleetView(
+      input({ drift: [driftRow({ unattributedDelta: 0.02, deltaExceedsThreshold: true })] }),
+    );
+    assert.equal(bigButWithin.summary.drift, false);
+    assert.equal(smallButOver.summary.drift, true);
   });
 
   test("uses the latest SETTLED row, skipping today's unreconciled one", () => {
@@ -297,8 +322,8 @@ describe("drift banner", () => {
     const view = buildFleetView(
       input({
         drift: [
-          driftRow({ date: "2026-09-15", unattributedDelta: 4.2 }),
-          driftRow({ date: "2026-09-16", unattributedDelta: null }),
+          driftRow({ date: "2026-09-15", unattributedDelta: 4.2, deltaExceedsThreshold: true }),
+          driftRow({ date: "2026-09-16", unattributedDelta: null, deltaExceedsThreshold: null }),
         ],
       }),
     );
@@ -309,8 +334,8 @@ describe("drift banner", () => {
     const view = buildFleetView(
       input({
         drift: [
-          driftRow({ date: "2026-09-13", unattributedDelta: 0 }),
-          driftRow({ date: "2026-09-14", unattributedDelta: 4.2 }),
+          driftRow({ date: "2026-09-13", unattributedDelta: 0, deltaExceedsThreshold: false }),
+          driftRow({ date: "2026-09-14", unattributedDelta: 4.2, deltaExceedsThreshold: true }),
         ],
       }),
     );

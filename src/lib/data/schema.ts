@@ -134,6 +134,10 @@ export interface AccountDailyReconciliation {
   all_marks_complete: boolean | null;
   unattributed_delta: number | null;
   unattributed_fraction_of_allocated: number | null;
+  /** `max($0.50, 25bp × allocated)` — the one definition, shared with the email alert. */
+  delta_threshold: number;
+  /** Null exactly when `unattributed_delta` is null. */
+  delta_exceeds_threshold: boolean | null;
 }
 
 /** Read directly for open positions (`status = 'open'`). */

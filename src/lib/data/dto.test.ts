@@ -286,6 +286,8 @@ const DRIFT_ROW: AccountDailyReconciliation = {
   all_marks_complete: true,
   unattributed_delta: 1.2552,
   unattributed_fraction_of_allocated: 0.001569,
+  delta_threshold: 2,
+  delta_exceeds_threshold: false,
 };
 
 describe("toDriftRow", () => {
@@ -306,6 +308,23 @@ describe("toDriftRow", () => {
 
   test("zero drift is preserved as zero", () => {
     assert.equal(toDriftRow({ ...DRIFT_ROW, unattributed_delta: 0 }).unattributedDelta, 0);
+  });
+
+  test("carries the view's threshold and verdict through unchanged", () => {
+    const row = toDriftRow({ ...DRIFT_ROW, delta_exceeds_threshold: true });
+    assert.equal(row.deltaThreshold, 2);
+    assert.equal(row.deltaExceedsThreshold, true);
+  });
+
+  test("a null verdict stays null — an unreconciled day is not 'within'", () => {
+    // false would read as "checked and fine". The day was never checked.
+    const row = toDriftRow({
+      ...DRIFT_ROW,
+      unattributed_delta: null,
+      delta_exceeds_threshold: null,
+    });
+    assert.equal(row.deltaExceedsThreshold, null);
+    assert.notEqual(row.deltaExceedsThreshold, false);
   });
 });
 

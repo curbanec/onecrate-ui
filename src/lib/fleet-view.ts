@@ -318,7 +318,6 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   // last settled day. Take the newest row that actually reconciled instead.
   const reconciled = drift.filter((row) => row.unattributedDelta !== null);
   const latestDrift = reconciled.length === 0 ? null : reconciled[reconciled.length - 1]!;
-  const delta = latestDrift?.unattributedDelta ?? null;
 
   const series = buildSeries(platform);
 
@@ -340,15 +339,21 @@ export function buildFleetView(input: FleetViewInput): FleetView {
     capitalWeightedReturn: endpoint(series.capitalWeighted),
     equalWeightedReturn: endpoint(series.equalWeighted),
     /**
-     * Non-null AND non-zero. Nothing else.
+     * The view's verdict, and nothing else.
      *
-     * Null means nobody reconciled that day; zero means the books agree. Only
-     * the third case is drift, and ANY amount of it is worth surfacing — the
-     * platform's own $1.00 alarm threshold is tuned for paging someone at
-     * night, which is a different question from whether an operator reading
-     * the page should be told the books disagree.
+     * `delta_exceeds_threshold` applies `max($0.50, 25bp × allocated)` — the
+     * same definition the snapshot function's email alert reads. The banner
+     * and the email therefore always agree about what counts as drift; the
+     * formula exists in one place, the view, and is not restated here.
+     *
+     * Any non-zero delta used to count. That stopped being useful once the
+     * reconciliation moved onto a single clock: a day with an open position
+     * now settles to a few cents of mark-vs-valuation residual rather than
+     * exactly zero, so the banner would have been on almost every day.
+     *
+     * Null means the day did not reconcile; it is never drift.
      */
-    drift: delta !== null && delta !== 0,
+    drift: latestDrift?.deltaExceedsThreshold === true,
     openPositions: executors.filter((executor) => executor.state === "open").length,
   };
 

@@ -367,6 +367,14 @@ export interface DriftRow {
    */
   unattributedDelta: number | null;
   unattributedFractionOfAllocated: number | null;
+  /**
+   * `max($0.50, 25bp × allocated)`, computed by the view. Defined there and
+   * nowhere else, so the banner and the snapshot function's email alert can
+   * never disagree about what counts as drift.
+   */
+  deltaThreshold: number | null;
+  /** The view's verdict. Null means the day did not reconcile — not "within". */
+  deltaExceedsThreshold: boolean | null;
 }
 
 export function toDriftRow(row: AccountDailyReconciliation): DriftRow {
@@ -388,6 +396,8 @@ export function toDriftRow(row: AccountDailyReconciliation): DriftRow {
     unattributedFractionOfAllocated: toNumberOrNull(
       row.unattributed_fraction_of_allocated,
     ),
+    deltaThreshold: toNumberOrNull(row.delta_threshold),
+    deltaExceedsThreshold: toBooleanOrNull(row.delta_exceeds_threshold),
   };
 }
 
