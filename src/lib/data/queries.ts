@@ -133,10 +133,17 @@ export async function getPlatformPerformance(
       "snapshot_date",
       // NULLIF keeps a zero-allocation day as "no answer" rather than a
       // divide-by-zero or a fabricated 0%.
-      sql<number | null>`SUM(daily_pnl) / NULLIF(SUM(allocated_capital), 0)`.as(
+      //
+      // The COUNT(*) = COUNT(col) guard is what stops a PARTIAL platform total.
+      // daily_pnl is null for any executor whose previous trading day is missing,
+      // and SUM silently skips nulls — which would report a platform figure that
+      // quietly excludes one executor. A day nobody can total is no answer.
+      sql<number | null>`CASE WHEN COUNT(*) = COUNT(daily_pnl)
+            THEN SUM(daily_pnl) END / NULLIF(SUM(allocated_capital), 0)`.as(
         "capital_weighted_return",
       ),
-      sql<number | null>`AVG(daily_return)`.as("equal_weighted_return"),
+      sql<number | null>`CASE WHEN COUNT(*) = COUNT(daily_return)
+            THEN AVG(daily_return) END`.as("equal_weighted_return"),
       fn.countAll<number>().as("executor_count"),
       // MIN over 0/1: the platform day is complete only if every executor's is.
       sql<number | null>`MIN(CAST(is_complete AS int))`.as("is_complete"),

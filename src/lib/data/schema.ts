@@ -23,6 +23,12 @@
 /** Grain: one row per executor, per day, per environment. */
 export interface ExecutorDailyPerformance {
   snapshot_date: Date;
+  /**
+   * The trading day before `snapshot_date`, per the Alpaca calendar. The view
+   * locates the preceding row through this rather than LAG, so a missing day
+   * yields a null `daily_pnl` instead of a two-day figure.
+   */
+  prev_trading_day: Date | null;
   strategy_name: string;
   strategy_version: string;
   instance_id: string;
@@ -111,6 +117,8 @@ export interface TradeExecutionQuality {
 /** Grain: one row per environment per day. */
 export interface AccountDailyReconciliation {
   snapshot_date: Date;
+  /** See `ExecutorDailyPerformance.prev_trading_day`. */
+  prev_trading_day: Date | null;
   environment: string;
   equity: number;
   last_equity: number;

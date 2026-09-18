@@ -290,6 +290,21 @@ describe("drift banner", () => {
     assert.equal(view.summary.drift, true);
   });
 
+  test("uses the latest SETTLED row, skipping today's unreconciled one", () => {
+    // Today is always present and always null: its 16:00 close only becomes
+    // knowable as tomorrow's last_equity. Reading the newest row outright would
+    // hide yesterday's real discrepancy behind today's "unknown".
+    const view = buildFleetView(
+      input({
+        drift: [
+          driftRow({ date: "2026-09-15", unattributedDelta: 4.2 }),
+          driftRow({ date: "2026-09-16", unattributedDelta: null }),
+        ],
+      }),
+    );
+    assert.equal(view.summary.drift, true);
+  });
+
   test("uses the latest row, not the first", () => {
     const view = buildFleetView(
       input({

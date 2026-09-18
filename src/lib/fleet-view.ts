@@ -312,7 +312,12 @@ export function buildFleetView(input: FleetViewInput): FleetView {
 
   const withPnl = executors.filter((executor) => executor.cumulativePnl !== null);
 
-  const latestDrift = drift.length === 0 ? null : drift[drift.length - 1]!;
+  // The newest row is always TODAY, and today can never be reconciled: its 16:00
+  // close is only knowable as tomorrow's last_equity. Reading the newest row
+  // outright would leave this permanently null and hide a real discrepancy on the
+  // last settled day. Take the newest row that actually reconciled instead.
+  const reconciled = drift.filter((row) => row.unattributedDelta !== null);
+  const latestDrift = reconciled.length === 0 ? null : reconciled[reconciled.length - 1]!;
   const delta = latestDrift?.unattributedDelta ?? null;
 
   const series = buildSeries(platform);

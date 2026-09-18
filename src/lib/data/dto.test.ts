@@ -24,6 +24,7 @@ import type { AccountDailyReconciliation, ExecutorDailyPerformance } from "./sch
 /** A flat day for gap-fade HOOD, shaped like a real row from the live view. */
 const PERFORMANCE_ROW: ExecutorDailyPerformance = {
   snapshot_date: new Date("2026-09-14T00:00:00.000Z"),
+  prev_trading_day: new Date("2026-09-11T00:00:00.000Z"),
   strategy_name: "gap-fade",
   strategy_version: "v3",
   instance_id: "instance-hood",
@@ -270,6 +271,7 @@ describe("toTradeRow", () => {
 
 const DRIFT_ROW: AccountDailyReconciliation = {
   snapshot_date: new Date("2026-09-14T00:00:00.000Z"),
+  prev_trading_day: new Date("2026-09-11T00:00:00.000Z"),
   environment: "live",
   equity: 1000,
   last_equity: 998.5,

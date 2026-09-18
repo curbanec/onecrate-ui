@@ -348,7 +348,13 @@ export interface DriftRow {
   cash: number;
   longMarketValue: number;
   shortMarketValue: number;
+  /**
+   * The day's equity change, as `last_equity(D+1) − last_equity(D)` — two of
+   * Alpaca's own 16:00 closes, on the same clock as the executors' marks. Null
+   * for the current day, which no successor row has settled yet.
+   */
   accountEquityChange: number | null;
+  /** Null when ANY executor's day is unknown. Never a partial sum. */
   executorDailyPnlSum: number | null;
   executorCount: number | null;
   totalAllocatedCapital: number | null;
