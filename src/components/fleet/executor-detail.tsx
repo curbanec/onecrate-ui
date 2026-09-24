@@ -20,8 +20,7 @@ export function ExecutorDetail({
   return (
     <div
       id={id}
-      className="bg-highlight grid gap-[14px] px-2 pt-0.5 pb-[14px]"
-      style={{ gridTemplateColumns: "1fr 1fr 188px" }}
+      className="bg-highlight grid grid-cols-1 gap-[14px] px-2 pt-0.5 pb-[14px] lg:grid-cols-[1fr_1fr_188px]"
     >
       <div>
         <Label className="mb-1.5">recent trades</Label>
@@ -69,7 +68,7 @@ export function ExecutorDetail({
         )}
       </div>
 
-      <div className="flex flex-col justify-between">
+      <div className="flex flex-col justify-between gap-3">
         <div>
           <Label className="mb-1.5">win rate</Label>
           <Figure

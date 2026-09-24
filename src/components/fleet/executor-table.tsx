@@ -27,7 +27,7 @@ export function ExecutorTable({ executors }: { executors: Executor[] }) {
   return (
     <div>
       <div
-        className="border-hair grid border-b px-2 pt-[14px] pb-2"
+        className="border-hair hidden border-b px-2 pt-[14px] pb-2 lg:grid"
         style={{ gridTemplateColumns: EXECUTOR_GRID }}
       >
         {COLUMNS.map((column) => (

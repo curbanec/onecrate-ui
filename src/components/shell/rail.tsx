@@ -19,7 +19,7 @@ export function Rail({
 }) {
   return (
     <div
-      className="bg-rail border-hair flex flex-none flex-col border-r"
+      className="bg-rail border-hair hidden flex-none flex-col border-r lg:flex"
       style={{ width: RAIL_WIDTH }}
     >
       <div

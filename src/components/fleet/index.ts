@@ -8,6 +8,7 @@ export { FleetChart } from "./fleet-chart";
 export { FreshnessStrip } from "./freshness-strip";
 export { HaltNotice, ManifestNotice } from "./page-notices";
 export { HeaderBand } from "./header-band";
+export { MobileHeader } from "./mobile-header";
 export { PlatformTotals } from "./platform-totals";
 export { ReturnsPanel } from "./returns-panel";
 export { SignalSlot } from "./signal-slot";

@@ -1,15 +1,3 @@
-/**
- * Data layer → Fleet component props.
- *
- * The prop boundary. Everything above this line speaks the database's language
- * (snake_case rows, fractions, nullable columns); everything below speaks the
- * components' (camelCase, percent units, em dashes). Keeping the translation in
- * one pure function means it can be tested without a database or a renderer,
- * and that the components never learn what a view is.
- *
- * Pure — no I/O, no `server-only`. See the note in `lib/data/normalize.ts`.
- */
-
 import {
   executorHref,
   executorKey,
@@ -34,7 +22,6 @@ import type {
   StrategyCharacter,
 } from "./fleet";
 
-/** Closed trades listed in the expanded card. */
 const RECENT_TRADES = 5;
 
 export interface FleetViewInput {
@@ -51,8 +38,6 @@ export interface FleetView {
   series: FleetSeries;
 }
 
-/* ── Per-executor helpers ─────────────────────────────────────────────────── */
-
 function groupBy<T>(rows: T[], key: (row: T) => string | null): Map<string, T[]> {
   const out = new Map<string, T[]>();
   for (const row of rows) {
@@ -65,21 +50,12 @@ function groupBy<T>(rows: T[], key: (row: T) => string | null): Map<string, T[]>
   return out;
 }
 
-/**
- * Strategy character, from the manifest's own bar timeframe.
- *
- * Intraday bars mean the strategy opens and closes within a session, which is
- * what decides whether the signal slot may draw a continuous line (§6.2). Read
- * from deployed configuration rather than guessed from the identifier.
- */
 function characterOf(executor: CurrentExecutor): {
   character: StrategyCharacter;
   timeframe: string | null;
 } {
   const timeframe = readTimeframe(executor.execution);
 
-  // With no declared timeframe there is nothing to infer from, so the cautious
-  // reading wins: 'continuous' makes no claim about days without trades.
   if (timeframe === null) return { character: "continuous", timeframe: null };
 
   return {
@@ -88,11 +64,6 @@ function characterOf(executor: CurrentExecutor): {
   };
 }
 
-/**
- * `execution.dataRequirements.timeframe` from the manifest, when present.
- * Not every deployed config carries it, so absence is expected rather than an
- * error.
- */
 export function readTimeframe(execution: Record<string, unknown>): string | null {
   const requirements = execution.dataRequirements;
   if (requirements === null || typeof requirements !== "object") return null;
@@ -101,7 +72,6 @@ export function readTimeframe(execution: Record<string, unknown>): string | null
   return typeof timeframe === "string" && timeframe !== "" ? timeframe : null;
 }
 
-/** Flatten the manifest's nested parameter groups into display lines. */
 export function flattenParameters(
   parameters: Record<string, unknown> | null,
 ): ParameterLine[] {
@@ -111,8 +81,6 @@ export function flattenParameters(
 
   const push = (label: string, value: unknown) => {
     if (value === null || value === undefined) {
-      // A null parameter is a real setting — "no take-profit" — so it is shown
-      // as an em dash rather than dropped.
       lines.push({ label, value: "—" });
       return;
     }
@@ -143,16 +111,6 @@ function toRecentTrade(trade: TradeRow): RecentTrade {
   };
 }
 
-/**
- * Win rate over closed trades, in percent units.
- *
- * Computed here because no view provides it — unlike daily_pnl or slippage,
- * which are read rather than recomputed. Trades with a null P&L are excluded
- * from both numerator and denominator: an unknown outcome is not a loss.
- *
- * Whether it is ever *displayed* is a separate question, answered by
- * withhold() against the evidence threshold.
- */
 export function winRateOf(trades: TradeRow[]): number | null {
   const settled = trades.filter((trade) => trade.pnl !== null);
   if (settled.length === 0) return null;
@@ -161,15 +119,12 @@ export function winRateOf(trades: TradeRow[]): number | null {
   return (wins / settled.length) * 100;
 }
 
-/** Marks for one executor's signal slot, oldest first. */
 function marksOf(rows: DailyPerformanceRow[]): Mark[] {
   return rows
     .filter((row) => row.cumulativePnl !== null)
     .map((row) => ({
       date: row.date,
       t: Date.parse(`${row.date}T00:00:00.000Z`),
-      // The card's marks are cumulative P&L in dollars, not percent — the slot
-      // shows shape, and the P&L column beside it carries the number.
       value: row.cumulativePnl as number,
       carried: isCarriedMark(row.markSource),
     }));
@@ -180,20 +135,6 @@ function stateOf(executor: CurrentExecutor, halted: boolean): ExecutorState {
   return executor.openTrades.length > 0 ? "open" : "idle";
 }
 
-/* ── Platform series ──────────────────────────────────────────────────────── */
-
-/**
- * Compound a run of daily returns into a cumulative curve, in percent.
- *
- * The chart's axis is "cumulative return", but `getPlatformPerformance` returns
- * a per-DAY figure, and no view carries a platform-level cumulative return. So
- * the chaining happens here: (1+r₁)(1+r₂)… − 1, which is how returns actually
- * compose. Days the aggregate could not answer (null) contribute nothing rather
- * than being treated as 0% — a day with no allocation is not a flat day.
- *
- * This is the one figure on the page computed from more than one row, and it is
- * flagged in the Stage 4 report as a judgement call.
- */
 function compound(rows: PlatformPerformanceRow[], pick: (row: PlatformPerformanceRow) => number | null): Mark[] {
   let factor = 1;
 
@@ -205,8 +146,6 @@ function compound(rows: PlatformPerformanceRow[], pick: (row: PlatformPerformanc
       date: row.date,
       t: Date.parse(`${row.date}T00:00:00.000Z`),
       value: (factor - 1) * 100,
-      // The platform aggregate has no mark_source; carried marks are a
-      // per-executor fact and are reported in the freshness strip instead.
       carried: false,
     };
   });
@@ -244,8 +183,6 @@ function endpoint(marks: Mark[]): number | null {
   return marks.length === 0 ? null : marks[marks.length - 1]!.value;
 }
 
-/* ── The mapping ──────────────────────────────────────────────────────────── */
-
 export function buildFleetView(input: FleetViewInput): FleetView {
   const { current, daily, platform, closedTrades, drift } = input;
 
@@ -256,8 +193,6 @@ export function buildFleetView(input: FleetViewInput): FleetView {
 
   const halted = current.halt === "halted";
 
-  // Latest snapshot date across the whole environment, for the freshness strip
-  // and for deciding which rows count as "the latest day".
   const asOf =
     daily.length === 0
       ? null
@@ -279,9 +214,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
       state: stateOf(executor, halted),
       character,
       allocated: executor.allocatedCapital,
-      // A real zero: no open position is a fact the data supports.
       deployed: executor.deployedCapital,
-      // Null, not zero, until this executor has a snapshot row.
       cumulativePnl: latest?.cumulativePnl ?? null,
       closedTrades: closed.length,
       winRate: winRateOf(closed),
@@ -300,8 +233,6 @@ export function buildFleetView(input: FleetViewInput): FleetView {
     };
   });
 
-  // Carried marks on the LATEST day only — the freshness strip answers "is what
-  // I am looking at right now live", not "has anything ever been carried".
   const carriedToday = executors.filter(
     (executor) => executor.carriedMark && asOf !== null,
   );
@@ -312,10 +243,6 @@ export function buildFleetView(input: FleetViewInput): FleetView {
 
   const withPnl = executors.filter((executor) => executor.cumulativePnl !== null);
 
-  // The newest row is always TODAY, and today can never be reconciled: its 16:00
-  // close is only knowable as tomorrow's last_equity. Reading the newest row
-  // outright would leave this permanently null and hide a real discrepancy on the
-  // last settled day. Take the newest row that actually reconciled instead.
   const reconciled = drift.filter((row) => row.unattributedDelta !== null);
   const latestDrift = reconciled.length === 0 ? null : reconciled[reconciled.length - 1]!;
 
@@ -329,30 +256,18 @@ export function buildFleetView(input: FleetViewInput): FleetView {
       (sum, executor) => sum + (executor.allocated ?? 0),
       0,
     ),
-    // Null rather than 0 when nothing has reported — summing an empty set to
-    // zero would claim the book is flat.
     cumulativePnl:
       withPnl.length === 0
         ? null
         : withPnl.reduce((sum, executor) => sum + (executor.cumulativePnl as number), 0),
     closedTrades: executors.reduce((sum, executor) => sum + executor.closedTrades, 0),
+    allTimeClosedTrades: closedTrades.length,
+    allTimePnl: closedTrades.reduce<number | null>(
+      (sum, trade) => (trade.pnl === null ? sum : (sum ?? 0) + trade.pnl),
+      null,
+    ),
     capitalWeightedReturn: endpoint(series.capitalWeighted),
     equalWeightedReturn: endpoint(series.equalWeighted),
-    /**
-     * The view's verdict, and nothing else.
-     *
-     * `delta_exceeds_threshold` applies `max($0.50, 25bp × allocated)` — the
-     * same definition the snapshot function's email alert reads. The banner
-     * and the email therefore always agree about what counts as drift; the
-     * formula exists in one place, the view, and is not restated here.
-     *
-     * Any non-zero delta used to count. That stopped being useful once the
-     * reconciliation moved onto a single clock: a day with an open position
-     * now settles to a few cents of mark-vs-valuation residual rather than
-     * exactly zero, so the banner would have been on almost every day.
-     *
-     * Null means the day did not reconcile; it is never drift.
-     */
     drift: latestDrift?.deltaExceedsThreshold === true,
     openPositions: executors.filter((executor) => executor.state === "open").length,
   };
