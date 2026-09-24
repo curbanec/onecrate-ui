@@ -525,6 +525,103 @@ describe("summary totals", () => {
     const view = buildFleetView(input({ closedTrades: [trade(), trade({ tradeId: "t2" })] }));
     assert.equal(view.summary.closedTrades, 2);
     assert.equal(view.executors[0]!.closedTrades, 2);
+    // Every trade here belongs to a deployed executor, so the two agree. The
+    // tests below are the cases where they must not.
+    assert.equal(view.summary.allTimeClosedTrades, 2);
+  });
+
+  /** gap-fade v2 — real history, no longer in the manifest. */
+  const RETIRED = {
+    strategyName: "gap-fade",
+    strategyVersion: "v2",
+    instanceId: "instance-prod",
+  };
+
+  test("a retired executor's trades count all-time, but against no card", () => {
+    const view = buildFleetView(
+      input({
+        closedTrades: [trade(), trade({ tradeId: "t2", triple: RETIRED })],
+      }),
+    );
+
+    // The card total still reconciles with the one executor on screen...
+    assert.equal(view.executors.length, 1);
+    assert.equal(view.executors[0]!.closedTrades, 1);
+    assert.equal(view.summary.closedTrades, 1);
+    // ...while the all-time figure sees the trade that has nowhere to live.
+    assert.equal(view.summary.allTimeClosedTrades, 2);
+  });
+
+  test("a trade with an incomplete identity still closed", () => {
+    // Grouping discards a null triple — it addresses no executor. That is a
+    // reason to leave it off a card, not a reason to deny it happened.
+    const view = buildFleetView(
+      input({ closedTrades: [trade({ tradeId: "t2", triple: null })] }),
+    );
+
+    assert.equal(view.summary.closedTrades, 0);
+    assert.equal(view.summary.allTimeClosedTrades, 1);
+  });
+
+  test("an empty environment reports zero rather than an absence", () => {
+    // A real count: no trades closed is a fact, unlike a null P&L (§6.7).
+    const view = buildFleetView(input({ closedTrades: [] }));
+    assert.equal(view.summary.allTimeClosedTrades, 0);
+  });
+
+  /**
+   * allTimePnl and cumulativePnl answer different questions and are built from
+   * different sources, which is the whole reason both exist.
+   *
+   * cumulativePnl reads each deployed executor's latest snapshot row, and the
+   * snapshot series only begins 2026-07-20. allTimePnl sums the closed trades
+   * themselves, which reach back to 2026-04-09. Verified against live data: the
+   * view's cumulative_pnl equals realized P&L restricted to the snapshot window
+   * to the cent, so the gap between these two figures is a difference of PERIOD
+   * — plus the retired executor, whose trades all closed before snapshots began.
+   */
+  test("all-time P&L counts a retired executor's trades; the header does not", () => {
+    const view = buildFleetView(
+      input({
+        closedTrades: [
+          trade({ pnl: 10 }),
+          trade({ tradeId: "t2", triple: RETIRED, pnl: -4 }),
+        ],
+      }),
+    );
+
+    assert.equal(view.summary.allTimePnl, 6);
+    // Unchanged: it comes from the snapshot row, not from these trades.
+    assert.equal(view.summary.cumulativePnl, -11.119);
+  });
+
+  test("an unsettled trade is excluded rather than counted as zero", () => {
+    // A trade with no P&L has an unknown outcome, which is not a $0 outcome.
+    // It still closed, so the COUNT includes it while the sum does not.
+    const view = buildFleetView(
+      input({ closedTrades: [trade({ pnl: 5 }), trade({ tradeId: "t2", pnl: null })] }),
+    );
+
+    assert.equal(view.summary.allTimePnl, 5);
+    assert.equal(view.summary.allTimeClosedTrades, 2);
+  });
+
+  test("all-time P&L is null, not zero, when nothing has settled", () => {
+    // Summing an empty set to zero would claim the book is flat — the same rule
+    // cumulativePnl follows.
+    assert.equal(buildFleetView(input({ closedTrades: [] })).summary.allTimePnl, null);
+    assert.equal(
+      buildFleetView(input({ closedTrades: [trade({ pnl: null })] })).summary.allTimePnl,
+      null,
+    );
+  });
+
+  test("a book that nets out to zero is a real zero", () => {
+    const view = buildFleetView(
+      input({ closedTrades: [trade({ pnl: 4 }), trade({ tradeId: "t2", pnl: -4 })] }),
+    );
+    assert.equal(view.summary.allTimePnl, 0);
+    assert.notEqual(view.summary.allTimePnl, null);
   });
 
   test("asOf is the latest snapshot date", () => {
