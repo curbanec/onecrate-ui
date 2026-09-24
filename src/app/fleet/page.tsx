@@ -6,6 +6,7 @@ import {
   HaltNotice,
   HeaderBand,
   ManifestNotice,
+  MobileHeader,
   ReturnsPanel,
 } from "@/components/fleet";
 import { parseDeploymentEnv } from "@/lib/data";
@@ -72,8 +73,13 @@ export default async function FleetPage({ searchParams }: PageProps<"/fleet">) {
             <ManifestNotice status={current.manifestStatus} error={current.manifestError} />
             <HaltNotice halt={current.halt} />
             <DriftBanner drift={summary.drift} />
-            <HeaderBand title="Fleet" summary={summary} />
-            <ReturnsPanel summary={summary} series={series} />
+            <MobileHeader title="Fleet" summary={summary} />
+            {/* Desktop only: the chart is too much for a phone, and the band
+                aligns to a hairline cross the narrow layout does not draw. */}
+            <div className="hidden lg:block">
+                <HeaderBand title="Fleet" summary={summary} />
+                <ReturnsPanel summary={summary} series={series} />
+            </div>
             <ExecutorTable executors={executors} />
         </AppShell>
     );

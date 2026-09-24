@@ -1,4 +1,4 @@
-import { Figure, Note, SampleNote } from "@/components/primitives";
+import { Figure, Label, Note, SampleNote } from "@/components/primitives";
 import { EXECUTOR_GRID, ROW_MIN_HEIGHT } from "@/lib/design";
 import type { Executor } from "@/lib/fleet";
 import { ExecutorDetail } from "./executor-detail";
@@ -22,11 +22,23 @@ export function ExecutorRow({
       onClick={onToggle}
       className="border-hair hover:bg-highlight cursor-pointer border-b"
     >
+      {/*
+        Below lg the spine becomes a stacked card: identifier and caret on top,
+        the four figures in a 2×2 under it, signal full width at the bottom.
+        The column header row is hidden there, so each figure carries its own
+        label. At lg every cell drops its explicit placement and flows back
+        into the shared spine (§5.4).
+      */}
       <div
-        className="grid items-center p-2"
-        style={{ gridTemplateColumns: EXECUTOR_GRID, minHeight: ROW_MIN_HEIGHT }}
+        className="grid grid-cols-[1fr_1fr_24px] items-start gap-x-4 gap-y-3 p-2 lg:[grid-template-columns:var(--executor-grid)] lg:items-center lg:gap-0"
+        style={
+          {
+            "--executor-grid": EXECUTOR_GRID,
+            minHeight: ROW_MIN_HEIGHT,
+          } as React.CSSProperties
+        }
       >
-        <div>
+        <div className="col-span-2 lg:col-span-1">
           <a
             href={executor.href}
             onClick={stop}
@@ -37,19 +49,29 @@ export function ExecutorRow({
           <Note className="mt-[3px]">{executor.note}</Note>
         </div>
 
-        <Figure value={executor.allocated} format="currency" precision={0} className="block text-right" />
-        <Figure value={executor.deployed} format="currency" precision={0} className="block text-right" />
+        <div className="col-start-1 lg:col-start-auto lg:text-right">
+          <Label className="mb-1 lg:hidden">allocated</Label>
+          <Figure value={executor.allocated} format="currency" precision={0} className="block" />
+        </div>
+        <div className="col-start-2 lg:col-start-auto lg:text-right">
+          <Label className="mb-1 lg:hidden">deployed</Label>
+          <Figure value={executor.deployed} format="currency" precision={0} className="block" />
+        </div>
 
-        <Figure
-          value={executor.cumulativePnl}
-          tone="direction"
-          format="currency"
-          signed
-          carried={executor.carriedMark}
-          className="block text-right font-medium"
-        />
+        <div className="col-start-1 lg:col-start-auto lg:text-right">
+          <Label className="mb-1 lg:hidden">cum. p&amp;l</Label>
+          <Figure
+            value={executor.cumulativePnl}
+            tone="direction"
+            format="currency"
+            signed
+            carried={executor.carriedMark}
+            className="block font-medium"
+          />
+        </div>
 
-        <div className="text-right">
+        <div className="col-start-2 lg:col-start-auto lg:text-right">
+          <Label className="mb-1 lg:hidden">trades</Label>
           <Figure
             value={executor.closedTrades}
             tone="evidence"
@@ -59,7 +81,7 @@ export function ExecutorRow({
           <SampleNote sampleSize={executor.closedTrades} className="mt-0.5" />
         </div>
 
-        <div className="pl-5">
+        <div className="col-span-full lg:col-span-1 lg:pl-5">
           <SignalSlot executor={executor} />
         </div>
 
@@ -71,7 +93,7 @@ export function ExecutorRow({
           }}
           aria-expanded={open}
           aria-controls={detailId}
-          className="text-note text-muted cursor-pointer text-right"
+          className="text-note text-muted col-start-3 row-start-1 cursor-pointer text-right lg:col-start-auto lg:row-start-auto"
         >
           <span aria-hidden="true">{open ? "−" : "+"}</span>
           <span className="sr-only">

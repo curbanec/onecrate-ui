@@ -13,7 +13,7 @@ export function FreshnessStrip({
   const isStale = stale ?? asOf === null;
 
   return (
-    <div className="bg-raised border-hair rounded-control flex items-baseline gap-[26px] self-start border px-[14px] py-[10px]">
+    <div className="bg-raised border-hair rounded-control flex flex-wrap items-baseline gap-x-[26px] gap-y-2 self-start border px-[14px] py-[10px]">
       <div>
         <Label>as of</Label>
         <div className="mt-1.5 flex items-baseline gap-2">
