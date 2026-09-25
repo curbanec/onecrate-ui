@@ -194,6 +194,41 @@ describe("a newly deployed executor", () => {
   });
 });
 
+describe("the signal note describes the days it actually plots", () => {
+  test("a fully flat history counts every mark as flat", () => {
+    const card = buildFleetView(
+      input({
+        daily: [
+          dailyRow({ date: "2026-09-11", cumulativePnl: -15.04 }),
+          dailyRow({ date: "2026-09-14", cumulativePnl: -11.119 }),
+        ],
+      }),
+    ).executors[0]!;
+
+    assert.equal(card.signalNote, "2 daily marks · 2 flat");
+  });
+
+  test("flat counts only days that produced a mark", () => {
+    // A row with no cumulative P&L plots no dot, so it cannot be one of the flat
+    // days the note describes. Counting it over every row instead would report
+    // "2 daily marks · 2 flat" here — claiming both marks were flat when one of
+    // them closed a trade, and in the general case letting the flat count exceed
+    // the number of marks the reader can see.
+    const card = buildFleetView(
+      input({
+        daily: [
+          dailyRow({ date: "2026-09-11", cumulativePnl: -15.04, tradesClosed: 0 }),
+          dailyRow({ date: "2026-09-12", cumulativePnl: null, tradesClosed: 0 }),
+          dailyRow({ date: "2026-09-14", cumulativePnl: -11.119, tradesClosed: 1 }),
+        ],
+      }),
+    ).executors[0]!;
+
+    assert.equal(card.marks.length, 2);
+    assert.equal(card.signalNote, "2 daily marks · 1 flat");
+  });
+});
+
 describe("cumulative P&L comes from the latest row", () => {
   test("uses the last row, never a sum across rows", () => {
     const view = buildFleetView(
@@ -433,6 +468,23 @@ describe("platform series", () => {
     assert.equal(view.summary.capitalWeightedReturn, null);
     assert.equal(view.summary.equalWeightedReturn, null);
     assert.match(view.series.provenance, /no platform history/);
+  });
+
+  test("rows are never carried, because this grain has no provenance", () => {
+    // mark_source exists per executor per day. A platform row compounds several
+    // executors into one number, so there is no single provenance to report and
+    // no honest value for a hollow dot — "any constituent carried" and "all of
+    // them carried" are different claims and neither is in the data. isComplete
+    // is the signal that does exist here, and provenance carries it. The chart
+    // legend advertises no carried mark for the same reason.
+    const view = buildFleetView(
+      input({ platform: [day("2026-09-10", 0.01, 0.01), day("2026-09-11", null, null)] }),
+    );
+
+    assert.ok(view.series.rows.length > 0);
+    assert.ok(view.series.rows.every((row) => row.carried === false));
+    assert.ok(view.series.capitalWeighted.every((mark) => mark.carried === false));
+    assert.ok(view.series.equalWeighted.every((mark) => mark.carried === false));
   });
 });
 

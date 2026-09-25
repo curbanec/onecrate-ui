@@ -119,9 +119,13 @@ export function winRateOf(trades: TradeRow[]): number | null {
   return (wins / settled.length) * 100;
 }
 
+function isMarked(row: DailyPerformanceRow): boolean {
+  return row.cumulativePnl !== null;
+}
+
 function marksOf(rows: DailyPerformanceRow[]): Mark[] {
   return rows
-    .filter((row) => row.cumulativePnl !== null)
+    .filter(isMarked)
     .map((row) => ({
       date: row.date,
       t: Date.parse(`${row.date}T00:00:00.000Z`),
@@ -205,6 +209,9 @@ export function buildFleetView(input: FleetViewInput): FleetView {
     const closed = closedByExecutor.get(key) ?? [];
     const { character, timeframe } = characterOf(executor);
     const marks = marksOf(rows);
+    const flatMarks = rows.filter(
+      (row) => isMarked(row) && row.tradesClosed === 0,
+    ).length;
 
     return {
       id: key,
@@ -222,7 +229,7 @@ export function buildFleetView(input: FleetViewInput): FleetView {
       signalNote:
         marks.length === 0
           ? "no daily marks yet"
-          : `${marks.length} daily marks · ${rows.filter((row) => row.tradesClosed === 0).length} flat`,
+          : `${marks.length} daily marks · ${flatMarks} flat`,
       tradesNote:
         closed.length === 0
           ? "no closed trades yet"

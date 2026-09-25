@@ -9,10 +9,6 @@ export function ChartLegend() {
         <span className="w-[14px] border-t-[1.5px] border-dashed border-[var(--chart-ew)]" />
         equal-wtd
       </span>
-      <span className="flex items-center gap-1.5 whitespace-nowrap">
-        <span className="border-flat size-[7px] rounded-full border-[1.5px]" />
-        carried mark
-      </span>
     </div>
   );
 }
