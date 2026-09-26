@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "TZ=America/New_York tsx --test src/lib/*.test.ts src/lib/data/*.test.ts",
+    "test": "TZ=America/New_York tsx --test src/lib/*.test.ts src/lib/data/*.test.ts src/components/fleet/*.test.tsx",
     "auth:generate": "tsx --env-file=.env.local scripts/migrate-auth.ts --dry-run",
     "auth:migrate": "tsx --env-file=.env.local scripts/migrate-auth.ts",
     "seed:operator": "tsx --env-file=.env.local scripts/seed-operator.ts"

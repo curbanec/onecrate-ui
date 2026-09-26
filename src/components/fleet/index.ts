@@ -1,5 +1,5 @@
 export { ChartLegend } from "./chart-legend";
-export { DailyMarks } from "./daily-marks";
+export { DailyMarks, EquityLine } from "./daily-marks";
 export { DriftBanner } from "./drift-banner";
 export { ExecutorDetail } from "./executor-detail";
 export { ExecutorRow } from "./executor-row";
