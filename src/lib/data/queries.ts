@@ -4,6 +4,7 @@ import { sql } from "kysely";
 
 import {
   assertDateRange,
+  assertTriples,
   dayAfter,
   dayStart,
   toDailyPerformanceRow,
@@ -108,24 +109,51 @@ export async function getDailyPerformance(
 
 /* ── Platform aggregate ───────────────────────────────────────────────────── */
 
+export interface PlatformPerformanceOptions extends DateRange {
+  /**
+   * Restrict the aggregate to this SET of executors. Omit for every executor
+   * that ever reported in the environment.
+   */
+  triples?: ExecutorTriple[];
+}
+
 /**
- * One row per day, aggregated across every executor in the environment.
+ * One row per day, aggregated across the executors in scope.
  *
- * The signature takes `DateRange` and nothing else. There is deliberately no
- * `triple` parameter: a "platform total" filtered to one executor is not a
- * platform total, and the only way to be sure nobody asks for one is for the
- * request to be unrepresentable. TypeScript's excess-property check rejects
- * `{ triple }` on a literal passed here.
+ * There is still no `triple` parameter, and the reasoning that ruled one out
+ * has not changed: a "platform total" filtered to ONE executor is not a platform
+ * total, it is that executor's own series, and `getDailyPerformance` already
+ * returns exactly that. Keeping the singular form unrepresentable is what stops
+ * a caller reaching for this function to answer a per-executor question.
+ *
+ * A SET is a different thing, and is permitted. Every row still aggregates
+ * across a population, so each figure remains a platform total — of the
+ * population named. That is what the Fleet page's Current scope needs: this same
+ * GROUP BY restricted to the triples in the deployment manifest, so the curve
+ * and the figures beside it describe one population instead of two.
+ *
+ * Numerator and denominator are filtered TOGETHER. `SUM(daily_pnl)` and
+ * `SUM(allocated_capital)` both see only the scoped rows, so capital-weighted
+ * return keeps meaning dollars earned over dollars allocated in either scope.
+ * Conditional aggregation over the numerator alone would divide one population's
+ * P&L by another's capital, which is not a return of anything.
+ *
+ * The filter is an OR of ANDs rather than a tuple `IN`: T-SQL has no row
+ * constructor, and identity here is three columns. At a fleet of 3–8 that is the
+ * right shape.
+ *
+ * An empty array is NOT an omitted key — see `assertTriples`.
  *
  * This is the one place a figure is computed rather than read from a view, and
  * it is a GROUP BY in SQL — not arithmetic in TypeScript.
  */
 export async function getPlatformPerformance(
   environment: DeploymentEnv,
-  options: DateRange = {},
+  options: PlatformPerformanceOptions = {},
 ): Promise<PlatformPerformanceRow[]> {
   await requireSession();
   assertDateRange(options);
+  assertTriples(options.triples);
 
   let query = getTradingDb()
     .selectFrom("v_executor_daily_performance")
@@ -155,6 +183,21 @@ export async function getPlatformPerformance(
   }
   if (options.to !== undefined) {
     query = query.where("snapshot_date", "<=", dayStart(options.to));
+  }
+
+  const triples = options.triples;
+  if (triples !== undefined) {
+    query = query.where((eb) =>
+      eb.or(
+        triples.map((triple) =>
+          eb.and([
+            eb("strategy_name", "=", triple.strategyName),
+            eb("strategy_version", "=", triple.strategyVersion),
+            eb("instance_id", "=", triple.instanceId),
+          ]),
+        ),
+      ),
+    );
   }
 
   const rows = await query

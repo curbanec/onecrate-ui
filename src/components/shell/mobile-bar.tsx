@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS, navHref, type NavItem } from "@/lib/fleet";
+import { NAV_ITEMS, navHref, type FleetScope, type NavItem } from "@/lib/fleet";
 import type { DeploymentEnv } from "@/lib/data";
 import { EnvToggle } from "./env-toggle";
+import { ScopeToggle } from "./scope-toggle";
 
 const CUBE_TOP = "#8E76D6";
 
@@ -20,9 +21,12 @@ const CUBE_TOP = "#8E76D6";
 export function MobileBar({
   active,
   env,
+  scope,
 }: {
   active: NavItem;
   env: DeploymentEnv;
+  /** Population currently being viewed, carried across a PROD/DEV switch. */
+  scope?: FleetScope;
 }) {
   return (
     <div className="bg-rail border-hair border-b lg:hidden">
@@ -37,7 +41,22 @@ export function MobileBar({
             OneCrate
           </span>
         </div>
-        <EnvToggle env={env} basePath={navHref(active)} className="w-[112px]" />
+        <div className="flex flex-none flex-col gap-1.5">
+          <EnvToggle
+            env={env}
+            scope={scope}
+            basePath={navHref(active)}
+            className="w-[112px]"
+          />
+          {scope !== undefined && (
+            <ScopeToggle
+              scope={scope}
+              env={env}
+              basePath={navHref(active)}
+              className="w-[112px]"
+            />
+          )}
+        </div>
       </div>
 
       <nav className="flex gap-0.5 overflow-x-auto px-2 pb-2">

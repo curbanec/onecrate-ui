@@ -20,7 +20,11 @@ export function HeaderBand({
       style={{ height: headerBandHeight }}
     >
       <div className="flex flex-col justify-between">
-        <FreshnessStrip asOf={summary.asOf} carried={summary.carried} />
+        <FreshnessStrip
+          dataThrough={summary.dataThrough}
+          reconciledAsOf={summary.reconciledAsOf}
+          carried={summary.carried}
+        />
         <h1 className="text-heading m-0">{title}</h1>
       </div>
       <PlatformTotals summary={summary} />

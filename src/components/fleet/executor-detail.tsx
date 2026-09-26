@@ -1,5 +1,5 @@
 import { Figure, HatchedSlot, Label, Note } from "@/components/primitives";
-import { derivedNote, withhold, type Executor } from "@/lib/fleet";
+import { derivedNote, type Executor } from "@/lib/fleet";
 
 /** Trade exit date, reduced to the day. */
 function day(iso: string | null): string {
@@ -15,8 +15,6 @@ export function ExecutorDetail({
   id: string;
   onNavigate: (event: React.MouseEvent) => void;
 }) {
-  const winRate = withhold(executor.winRate, executor.closedTrades);
-
   return (
     <div
       id={id}
@@ -51,7 +49,14 @@ export function ExecutorDetail({
 
       <div>
         <Label className="mb-1.5">parameter set</Label>
-        {executor.parameters.length === 0 ? (
+        {/* Manifest-only, and the manifest is overwritten on every deploy, so a
+            retired executor's parameters are genuinely unrecoverable rather than
+            merely absent. Never substitute anything derived from the trade log. */}
+        {executor.kind === "retired" ? (
+          <HatchedSlot variant="block">
+            parameter set not recorded at retirement
+          </HatchedSlot>
+        ) : executor.parameters.length === 0 ? (
           <HatchedSlot variant="block">no parameters in the manifest</HatchedSlot>
         ) : (
           <div className="text-data-sm font-numeric grid grid-cols-2 gap-x-4 gap-y-1 tabular-nums">
@@ -72,9 +77,7 @@ export function ExecutorDetail({
         <div>
           <Label className="mb-1.5">win rate</Label>
           <Figure
-            value={winRate}
-            tone="evidence"
-            sampleSize={executor.closedTrades}
+            value={executor.winRate}
             size="lg"
             format="percent"
             precision={0}

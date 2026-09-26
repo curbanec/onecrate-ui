@@ -1,4 +1,4 @@
-import { Figure, Label, Note, SampleNote } from "@/components/primitives";
+import { Figure, Label, Note } from "@/components/primitives";
 import { EXECUTOR_GRID, ROW_MIN_HEIGHT } from "@/lib/design";
 import type { Executor } from "@/lib/fleet";
 import { ExecutorDetail } from "./executor-detail";
@@ -46,7 +46,13 @@ export function ExecutorRow({
           >
             {executor.title}
           </a>
-          <Note className="mt-[3px]">{executor.note}</Note>
+          {executor.kind === "live" ? (
+            <Note className="mt-[3px]">{executor.note}</Note>
+          ) : (
+            <Note className="mt-[3px]">
+              retired · active {executor.activeFrom} to {executor.activeTo}
+            </Note>
+          )}
         </div>
 
         <div className="col-start-1 lg:col-start-auto lg:text-right">
@@ -59,26 +65,20 @@ export function ExecutorRow({
         </div>
 
         <div className="col-start-1 lg:col-start-auto lg:text-right">
-          <Label className="mb-1 lg:hidden">cum. p&amp;l</Label>
+          <Label className="mb-1 lg:hidden">cumulative p&amp;l</Label>
           <Figure
             value={executor.cumulativePnl}
             tone="direction"
             format="currency"
             signed
-            carried={executor.carriedMark}
+            carried={executor.kind === "live" && executor.carriedMark}
             className="block font-medium"
           />
         </div>
 
         <div className="col-start-2 lg:col-start-auto lg:text-right">
           <Label className="mb-1 lg:hidden">trades</Label>
-          <Figure
-            value={executor.closedTrades}
-            tone="evidence"
-            sampleSize={executor.closedTrades}
-            className="block"
-          />
-          <SampleNote sampleSize={executor.closedTrades} className="mt-0.5" />
+          <Figure value={executor.closedTrades} className="block" />
         </div>
 
         <div className="col-span-full lg:col-span-1 lg:pl-5">

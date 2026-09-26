@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   assertDateOnly,
   assertDateRange,
+  assertTriples,
   dayAfter,
   dayStart,
   isCarriedMark,
@@ -369,5 +370,33 @@ describe("date bounds", () => {
     assert.equal(dayAfter("2026-08-31").toISOString(), "2026-09-01T00:00:00.000Z");
     assert.equal(dayAfter("2026-12-31").toISOString(), "2027-01-01T00:00:00.000Z");
     assert.equal(dayAfter("2028-02-28").toISOString(), "2028-02-29T00:00:00.000Z");
+  });
+});
+
+describe("executor set bounds", () => {
+  const TRIPLE = {
+    strategyName: "gap-fade",
+    strategyVersion: "v3",
+    instanceId: "instance-hood",
+  };
+
+  test("an omitted set means every executor in the environment", () => {
+    assert.doesNotThrow(() => assertTriples(undefined));
+  });
+
+  test("a populated set is a valid scope", () => {
+    assert.doesNotThrow(() => assertTriples([TRIPLE]));
+    assert.doesNotThrow(() =>
+      assertTriples([TRIPLE, { ...TRIPLE, instanceId: "instance-snow" }]),
+    );
+  });
+
+  test("an empty set throws rather than aggregating over everything", () => {
+    // `[]` is a real state, not a caller mistake: parseManifest reports an empty
+    // manifest as 'empty', and deployed.dev.json is `{}` today. Silently
+    // dropping the filter would answer "what did these zero executors do" with
+    // the whole environment's history — the most misleading answer available,
+    // and the one a caller is least likely to notice is wrong.
+    assert.throws(() => assertTriples([]), /empty/);
   });
 });

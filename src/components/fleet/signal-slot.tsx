@@ -10,6 +10,17 @@ import { DailyMarks } from "./daily-marks";
  * belongs here and has no data yet", where an empty box says nothing at all.
  */
 export function SignalSlot({ executor }: { executor: Executor }) {
+  /**
+   * A retired executor has daily marks in SQL, but what the slot is ALLOWED to
+   * draw depends on strategy character, and character comes from the manifest's
+   * `execution.dataRequirements.timeframe` — overwritten on every deploy. Without
+   * it there is no way to know whether discrete marks or an equity line would be
+   * the honest treatment, so the slot says what is missing instead of guessing.
+   */
+  if (executor.kind === "retired") {
+    return <HatchedSlot>strategy character not recorded at retirement</HatchedSlot>;
+  }
+
   if (executor.marks.length === 0) {
     return <HatchedSlot>{executor.signalNote}</HatchedSlot>;
   }

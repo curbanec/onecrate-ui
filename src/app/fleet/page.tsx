@@ -10,6 +10,7 @@ import {
   ReturnsPanel,
 } from "@/components/fleet";
 import { parseDeploymentEnv } from "@/lib/data";
+import { parseFleetScope } from "@/lib/fleet";
 import { getCurrentState } from "@/lib/data/current-state";
 import {
   getDailyPerformance,
@@ -44,6 +45,22 @@ export default async function FleetPage({ searchParams }: PageProps<"/fleet">) {
     const env = parseDeploymentEnv(requested);
 
     /**
+     * Which population every figure describes, from `?scope=`.
+     *
+     * `current` — the executors in the deployment manifest right now.
+     * `si`      — every executor that ever reported in this environment.
+     *
+     * In the URL for the same reason as `env`: `current` is biased upward by
+     * construction, because retired executors are disproportionately the ones
+     * that were not working. A shared link or a screenshot has to record which
+     * of the two readings it shows.
+     *
+     * Defaults to `current`, and anything unrecognised falls back there too.
+     */
+    const requestedScope = Array.isArray(params.scope) ? params.scope[0] : params.scope;
+    const scope = parseFleetScope(requestedScope);
+
+    /**
      * Five independent reads, issued together. They share no inputs — the
      * manifest comes from blob storage and the rest from SQL — so serializing
      * them would just add their latencies together.
@@ -51,13 +68,35 @@ export default async function FleetPage({ searchParams }: PageProps<"/fleet">) {
      * Each function performs its own session check; `verifySession()` is
      * memoized per render pass, so that costs one lookup rather than six.
      */
-    const [current, daily, platform, closedTrades, drift] = await Promise.all([
+    const [current, daily, closedTrades, drift] = await Promise.all([
         getCurrentState(env),
         getDailyPerformance(env),
-        getPlatformPerformance(env),
         getTrades(env, { status: "closed" }),
         getDrift(env),
     ]);
+
+    /**
+     * The platform aggregate for the population in scope. One query, not two:
+     * only the active scope is ever rendered.
+     *
+     * It cannot join the batch above because the Current variant needs the
+     * manifest triples that `getCurrentState` returns, and that call is itself in
+     * the batch. So the blob read stays parallel with the SQL reads and this one
+     * indexed GROUP BY runs after them.
+     *
+     * An empty manifest is skipped rather than queried: `getPlatformPerformance`
+     * rejects an empty `triples` array by design, because filtering to nothing
+     * and aggregating over everything must not be the same request. Nothing is
+     * deployed, so the Current curve is genuinely empty — and `ManifestNotice`
+     * already says so in its own banner.
+     */
+    const triples = current.executors.map((executor) => executor.triple);
+    const platform =
+        scope === "si"
+            ? await getPlatformPerformance(env)
+            : triples.length === 0
+              ? []
+              : await getPlatformPerformance(env, { triples });
 
     const { executors, summary, series } = buildFleetView({
         current,
@@ -65,10 +104,11 @@ export default async function FleetPage({ searchParams }: PageProps<"/fleet">) {
         platform,
         closedTrades,
         drift,
+        scope,
     });
 
     return (
-        <AppShell active="Fleet" env={env}>
+        <AppShell active="Fleet" env={env} scope={scope}>
             <AutoRefresh />
             <ManifestNotice status={current.manifestStatus} error={current.manifestError} />
             <HaltNotice halt={current.halt} />

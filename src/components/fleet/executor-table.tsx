@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Label, StatusDot } from "@/components/primitives";
 import { EXECUTOR_GRID } from "@/lib/design";
-import type { Executor } from "@/lib/fleet";
+import type { Executor, LiveExecutor } from "@/lib/fleet";
 import { ExecutorRow } from "./executor-row";
 
 const COLUMNS = [
   { label: "executor", align: "" },
   { label: "allocated", align: "text-right" },
   { label: "deployed", align: "text-right" },
-  { label: "cum. p&l", align: "text-right" },
+  { label: "cumulative p&l", align: "text-right" },
   { label: "trades", align: "text-right" },
   { label: "signal", align: "pl-5" },
 ] as const;
@@ -21,8 +21,11 @@ export function ExecutorTable({ executors }: { executors: Executor[] }) {
   const toggle = (id: string) =>
     setOpen((current) => ({ ...current, [id]: !current[id] }));
 
-  const idle = executors.filter((e) => e.state === "idle").length;
-  const holding = executors.filter((e) => e.state === "open").length;
+  // Open-position counts describe running executors. A retired one holds
+  // nothing by definition, so it belongs in neither tally nor the denominator.
+  const live = executors.filter((e): e is LiveExecutor => e.kind === "live");
+  const idle = live.filter((e) => e.state === "idle").length;
+  const holding = live.filter((e) => e.state === "open").length;
 
   return (
     <div>
@@ -51,7 +54,7 @@ export function ExecutorTable({ executors }: { executors: Executor[] }) {
         <StatusDot status={holding > 0 ? "open" : "idle"} />
         <span>
           Open positions — {holding > 0 ? holding : "none"}
-          {idle === executors.length && " · all executors idle"}
+          {live.length > 0 && idle === live.length && " · all executors idle"}
         </span>
       </div>
     </div>

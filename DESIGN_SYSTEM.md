@@ -16,8 +16,9 @@ scratch where a shadcn primitive exists — restyle it with these tokens.
    capital, less, or none. Anything that does not serve that question is cut.
 2. **Numbers are most of the pixels.** The numeric face matters more than the display
    face. All figures are tabular.
-3. **Evidence quality is visible.** A statistic derived from 6 trades must not look as
-   authoritative as one from 200. Sample size sits adjacent to every derived figure.
+3. **Sample size is always reported.** A derived statistic carries the number of closed
+   trades behind it, so a figure from 6 and one from 200 are distinguishable. The figure
+   itself is neither withheld nor dimmed — see §6.1.
 4. **Density over air.** This is an instrument panel for one expert, not a landing page.
 5. **Card frames are fixed; card contents vary.** The spine is identical on every row so
    the eye reads straight down a column.
@@ -278,12 +279,19 @@ One constant, recorded once, never scattered through component logic:
 EVIDENCE_THRESHOLD = 30  // closed trades
 ```
 
-- Figures at or above threshold render in `ink` (`evidence-strong`).
-- Figures below threshold render in `flat` (`evidence-weak`) — they recede.
-- Sample size appears adjacent to every derived statistic: `n=31`, or `n=12 · weak`.
-- **Derived statistics below threshold are withheld, not shown.** Win rate at n=12
-  renders as `—` with the note "not derived below n=30". Showing a number with a
-  caveat is worse than not showing it.
+- **Derived statistics are always computed and always shown.** Win rate at n=8 renders
+  as a number, not as `—`.
+- **Sample size travels with the statistic.** Win rate carries `8 closed` directly
+  beneath it, so the figure is never read without its denominator.
+- Figures are not dimmed by sample size. A count of 8 and a count of 204 both render in
+  `ink`; the count itself is the evidence signal.
+- `EVIDENCE_THRESHOLD` remains defined and available to components, but no figure is
+  withheld or made recessive because of it.
+
+This reverses an earlier rule under which win rate below n=30 rendered as `—` with the
+note "not derived below n=30", and counts below threshold rendered in `flat`. The
+statistical caution stands — at n<30 a win-rate estimate carries roughly ±17 percentage
+points — and is now carried by reporting the sample rather than by hiding the figure.
 
 ### 6.2 The signal slot
 
@@ -312,12 +320,21 @@ Noticeable on inspection, invisible when scanning. A color would be too loud.
 A small raised block at the top of the header band: `background: raised`,
 `1px solid hair`, `radius-control`, padding 10px 14px, 26px gaps.
 
-- **AS OF** — timestamp, preceded by a `state-stale` dot when the data is older than
-  expected. Renders `—` when no timestamp is available.
-- **CARRIED MARKS** — count plus which executors, e.g. "1 · gap-fade v3 · SNOW".
+- **DATA THROUGH** — latest snapshot date across the live executors, preceded by a
+  `state-stale` dot when the data is older than expected. Renders `—` when no date is
+  available. Named for a day rather than a moment: `snapshot_date` is a DATE column, so
+  "as of" would imply a clock time the data does not carry.
+- **RECONCILED AS OF** — date of the most recent reconciliation that actually settled,
+  taken from the drift rows. Renders `—` when no day has settled. This is a freshness
+  fact, not a verdict: whether the books disagree stays in the banner (§6.5), and there
+  is still no always-on "no drift" readout and no all-clear tint here — a permanently
+  green strip is how the one amber morning gets skipped.
+- **STALE PRICES** — count of executors whose most recent mark was carried forward from
+  an earlier close, plus which ones, e.g. "1 · gap-fade v3 · SNOW". Named for what the
+  operator sees rather than for the `mark_source` column behind it; `mark` is not a UI
+  term.
 
-Only facts the data actually supports appear here. Do not add a reconciliation
-readout — see §6.5.
+Only facts the data actually supports appear here.
 
 ### 6.5 Reconciliation drift is a banner, not a panel
 
@@ -351,7 +368,8 @@ render as a hatched region with a label saying what belongs there.
 - Column headers and field labels: uppercase, `text-label`, letterspaced.
 - Metric explanations are one lowercase clause: "what the book actually earned",
   "how the average strategy behaved". No sentence case, no periods, no product voice.
-- Sample-size notes: `n=12 · weak`, `not derived below n=30`, `over 31 closed`.
+- Sample-size notes state the count and nothing else: `31 closed`. The forms
+  `over 31 closed`, `n=12 · weak` and `not derived below n=30` are retired — see §6.1.
 - Use the minus sign `−` (U+2212) in negative figures, not a hyphen — it matches the
   plus sign's width in tabular figures.
 
@@ -368,7 +386,7 @@ Do not:
 - Put a destructive control on a card in a list.
 - Make the whole card a link.
 - Use lime on or near a figure.
-- Show a derived statistic below the evidence threshold.
+- Show a derived statistic without its sample size beside it.
 - Interpolate a sparse series to look dense.
 - Add a metric, column, or content block that no data source supports.
 - Set a figure in a proportional face without tabular figures.

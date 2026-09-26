@@ -3,6 +3,14 @@ import type { FleetSeries, FleetSummary } from "@/lib/fleet";
 import { ChartLegend } from "./chart-legend";
 import { FleetChart } from "./fleet-chart";
 
+/**
+ * Platform returns for the population currently in scope.
+ *
+ * Both figures answer to the rail's Current/ITD switch — they are the same two
+ * metrics recomputed over a different population, not two readings shown side by
+ * side. Nothing on the panel names that population or its start date any more, so
+ * the toggle's own label is the only thing attributing these figures.
+ */
 export function ReturnsPanel({
   summary,
   series,
@@ -12,8 +20,8 @@ export function ReturnsPanel({
 }) {
   return (
     <div className="border-hair border-b pt-4 pb-[14px]">
-      <div className="mb-[10px] flex items-start justify-between">
-        <div className="flex gap-7">
+      <div className="mb-[10px] flex items-start justify-between gap-4">
+        <div className="flex flex-wrap gap-7">
           <div>
             <Label>capital-weighted</Label>
             <Figure
@@ -38,15 +46,11 @@ export function ReturnsPanel({
             <div className="text-body text-muted">how the average strategy behaved</div>
           </div>
         </div>
+
         <ChartLegend />
       </div>
 
       <FleetChart series={series} />
-
-      <div className="text-note text-muted mt-2 flex justify-between">
-        <span>{series.provenance}</span>
-        <span>0% reference</span>
-      </div>
     </div>
   );
 }

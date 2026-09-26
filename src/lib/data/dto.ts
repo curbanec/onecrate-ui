@@ -73,6 +73,26 @@ export function assertDateRange({ from, to }: DateRange): void {
   }
 }
 
+/**
+ * Reject an empty executor set before it reaches SQL.
+ *
+ * `undefined` means "every executor in the environment" and is valid. `[]` is a
+ * different request: it says nothing is in scope. That is a real state rather
+ * than a programming error — `parseManifest` reports an empty manifest as
+ * 'empty', and `deployed.dev.json` is `{}` today — so the filter cannot simply
+ * be dropped. Dropping it would answer "what did these zero executors do" with
+ * the whole environment's history, which is the most misleading answer
+ * available.
+ */
+export function assertTriples(triples: ExecutorTriple[] | undefined): void {
+  if (triples !== undefined && triples.length === 0) {
+    throw new TypeError(
+      "triples is empty. Omit the key to aggregate over every executor; " +
+        "an empty set is not a request for all of them.",
+    );
+  }
+}
+
 /** Midnight UTC on the given day. */
 export function dayStart(dateOnly: string): Date {
   assertDateOnly(dateOnly, "date");

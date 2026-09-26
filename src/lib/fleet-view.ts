@@ -9,20 +9,29 @@ import {
   type PlatformPerformanceRow,
   type TradeRow,
 } from "@/lib/data";
-import type {
-  CarriedMarks,
-  ChartRow,
-  Executor,
-  ExecutorState,
-  FleetSeries,
-  FleetSummary,
-  Mark,
-  ParameterLine,
-  RecentTrade,
-  StrategyCharacter,
+import {
+  DEFAULT_FLEET_SCOPE,
+  type CarriedMarks,
+  type ChartRow,
+  type Executor,
+  type ExecutorState,
+  type FleetScope,
+  type FleetSeries,
+  type FleetSummary,
+  type LiveExecutor,
+  type Mark,
+  type ParameterLine,
+  type RecentTrade,
+  type RetiredExecutor,
+  type StrategyCharacter,
 } from "./fleet";
 
 const RECENT_TRADES = 5;
+
+const POPULATION: Record<FleetScope, string> = {
+  current: "currently deployed executors",
+  si: "every executor that ever reported",
+};
 
 export interface FleetViewInput {
   current: CurrentState;
@@ -30,6 +39,7 @@ export interface FleetViewInput {
   platform: PlatformPerformanceRow[];
   closedTrades: TradeRow[];
   drift: DriftRow[];
+  scope?: FleetScope;
 }
 
 export interface FleetView {
@@ -139,6 +149,12 @@ function stateOf(executor: CurrentExecutor, halted: boolean): ExecutorState {
   return executor.openTrades.length > 0 ? "open" : "idle";
 }
 
+function tradesNoteOf(closed: number): string {
+  return closed === 0
+    ? "no closed trades yet"
+    : `${closed} closed trades — most recent ${Math.min(RECENT_TRADES, closed)}`;
+}
+
 function compound(rows: PlatformPerformanceRow[], pick: (row: PlatformPerformanceRow) => number | null): Mark[] {
   let factor = 1;
 
@@ -155,7 +171,10 @@ function compound(rows: PlatformPerformanceRow[], pick: (row: PlatformPerformanc
   });
 }
 
-function buildSeries(platform: PlatformPerformanceRow[]): FleetSeries {
+function buildSeries(
+  platform: PlatformPerformanceRow[],
+  population: string,
+): FleetSeries {
   const capitalWeighted = compound(platform, (row) => row.capitalWeightedReturn);
   const equalWeighted = compound(platform, (row) => row.equalWeightedReturn);
 
@@ -177,8 +196,8 @@ function buildSeries(platform: PlatformPerformanceRow[]): FleetSeries {
     to: platform[platform.length - 1]?.date ?? "",
     provenance:
       platform.length === 0
-        ? "no platform history for this environment"
-        : `${platform.length} trading days · daily platform returns compounded · gaps preserved` +
+        ? `no platform history · ${population}`
+        : `${population} · from ${platform[0]!.date} · ${platform.length} trading days · daily platform returns compounded · gaps preserved` +
           (incomplete > 0 ? ` · ${incomplete} estimated` : ""),
   };
 }
@@ -187,8 +206,45 @@ function endpoint(marks: Mark[]): number | null {
   return marks.length === 0 ? null : marks[marks.length - 1]!.value;
 }
 
+function retiredOf(
+  daily: DailyPerformanceRow[],
+  liveKeys: Set<string>,
+  closedByExecutor: Map<string, TradeRow[]>,
+): RetiredExecutor[] {
+  const byExecutor = groupBy(daily, (row) => {
+    const key = executorKey(row.triple);
+    return liveKeys.has(key) ? null : key;
+  });
+
+  const out: RetiredExecutor[] = [];
+
+  for (const [key, rows] of byExecutor) {
+    const last = rows[rows.length - 1]!;
+    const closed = closedByExecutor.get(key) ?? [];
+
+    out.push({
+      kind: "retired",
+      id: key,
+      title: `${last.triple.strategyName} ${last.triple.strategyVersion}`,
+      href: executorHref(last.triple),
+      allocated: last.allocatedCapital,
+      deployed: last.deployedCapital,
+      cumulativePnl: last.cumulativePnl,
+      closedTrades: closed.length,
+      winRate: winRateOf(closed),
+      activeFrom: rows[0]!.date,
+      activeTo: last.date,
+      tradesNote: tradesNoteOf(closed.length),
+      recentTrades: closed.slice(0, RECENT_TRADES).map(toRecentTrade),
+    });
+  }
+
+  return out;
+}
+
 export function buildFleetView(input: FleetViewInput): FleetView {
   const { current, daily, platform, closedTrades, drift } = input;
+  const scope = input.scope ?? DEFAULT_FLEET_SCOPE;
 
   const dailyByExecutor = groupBy(daily, (row) => executorKey(row.triple));
   const closedByExecutor = groupBy(closedTrades, (row) =>
@@ -196,24 +252,32 @@ export function buildFleetView(input: FleetViewInput): FleetView {
   );
 
   const halted = current.halt === "halted";
+  const liveKeys = new Set(current.executors.map((executor) => executor.key));
 
-  const asOf =
-    daily.length === 0
+  const liveDaily = daily.filter((row) => liveKeys.has(executorKey(row.triple)));
+  const dataThrough =
+    liveDaily.length === 0
       ? null
-      : daily.reduce((latest, row) => (row.date > latest ? row.date : latest), daily[0]!.date);
+      : liveDaily.reduce(
+          (latest, row) => (row.date > latest ? row.date : latest),
+          liveDaily[0]!.date,
+        );
 
-  const executors: Executor[] = current.executors.map((executor) => {
+  const live: LiveExecutor[] = current.executors.map((executor) => {
     const key = executor.key;
     const rows = dailyByExecutor.get(key) ?? [];
     const latest = rows.length === 0 ? null : rows[rows.length - 1]!;
     const closed = closedByExecutor.get(key) ?? [];
     const { character, timeframe } = characterOf(executor);
     const marks = marksOf(rows);
-    const flatMarks = rows.filter(
-      (row) => isMarked(row) && row.tradesClosed === 0,
+    const deployedDays = rows.length;
+    const tradedDays = rows.filter(
+      (row) => row.tradesOpened > 0 || row.tradesClosed > 0,
     ).length;
+    const heldDays = rows.filter((row) => row.openPositions > 0).length;
 
     return {
+      kind: "live",
       id: key,
       title: `${executor.triple.strategyName} ${executor.triple.strategyVersion} · ${executor.symbols.join(" / ")}`,
       note: timeframe === null ? character : `${character} · ${timeframe} bars`,
@@ -227,57 +291,80 @@ export function buildFleetView(input: FleetViewInput): FleetView {
       winRate: winRateOf(closed),
       carriedMark: latest === null ? false : isCarriedMark(latest.markSource),
       signalNote:
-        marks.length === 0
-          ? "no daily marks yet"
-          : `${marks.length} daily marks · ${flatMarks} flat`,
-      tradesNote:
-        closed.length === 0
-          ? "no closed trades yet"
-          : `${closed.length} closed trades — most recent ${Math.min(RECENT_TRADES, closed.length)}`,
+        deployedDays === 0
+          ? "no daily history yet"
+          : [
+              `${deployedDays} ${deployedDays === 1 ? "day" : "days"} deployed`,
+              `${tradedDays} traded`,
+              ...(character === "intraday" ? [] : [`${heldDays} held`]),
+            ].join(" · "),
+      tradesNote: tradesNoteOf(closed.length),
       marks,
       recentTrades: closed.slice(0, RECENT_TRADES).map(toRecentTrade),
       parameters: flattenParameters(executor.parameters),
     };
   });
 
-  const carriedToday = executors.filter(
-    (executor) => executor.carriedMark && asOf !== null,
+  const retired = retiredOf(daily, liveKeys, closedByExecutor);
+  const executors: Executor[] = scope === "si" ? [...live, ...retired] : [...live];
+
+  const carriedToday = live.filter(
+    (executor) => executor.carriedMark && dataThrough !== null,
   );
   const carried: CarriedMarks = {
     count: carriedToday.length,
     titles: carriedToday.map((executor) => executor.title),
   };
 
-  const withPnl = executors.filter((executor) => executor.cumulativePnl !== null);
+  const withPnl = live.filter((executor) => executor.cumulativePnl !== null);
 
   const reconciled = drift.filter((row) => row.unattributedDelta !== null);
   const latestDrift = reconciled.length === 0 ? null : reconciled[reconciled.length - 1]!;
 
-  const series = buildSeries(platform);
+  const series = buildSeries(platform, POPULATION[scope]);
 
-  const summary: FleetSummary = {
-    asOf,
+  const allTimeClosedTrades = closedTrades.length;
+  const allTimePnl = closedTrades.reduce<number | null>(
+    (sum, trade) => (trade.pnl === null ? sum : (sum ?? 0) + trade.pnl),
+    null,
+  );
+
+  const liveClosedTrades = live.reduce(
+    (sum, executor) => sum + executor.closedTrades,
+    0,
+  );
+  const liveCumulativePnl =
+    withPnl.length === 0
+      ? null
+      : withPnl.reduce((sum, executor) => sum + (executor.cumulativePnl as number), 0);
+
+  const base = {
+    dataThrough,
+    reconciledAsOf: latestDrift?.date ?? null,
     carried,
-    executorCount: executors.length,
-    allocated: executors.reduce(
-      (sum, executor) => sum + (executor.allocated ?? 0),
-      0,
-    ),
-    cumulativePnl:
-      withPnl.length === 0
-        ? null
-        : withPnl.reduce((sum, executor) => sum + (executor.cumulativePnl as number), 0),
-    closedTrades: executors.reduce((sum, executor) => sum + executor.closedTrades, 0),
-    allTimeClosedTrades: closedTrades.length,
-    allTimePnl: closedTrades.reduce<number | null>(
-      (sum, trade) => (trade.pnl === null ? sum : (sum ?? 0) + trade.pnl),
-      null,
-    ),
+    executorCount: scope === "si" ? live.length + retired.length : live.length,
+    retiredCount: retired.length,
+    cumulativePnl: scope === "si" ? allTimePnl : liveCumulativePnl,
+    closedTrades: scope === "si" ? allTimeClosedTrades : liveClosedTrades,
+    allTimeClosedTrades,
+    allTimePnl,
     capitalWeightedReturn: endpoint(series.capitalWeighted),
     equalWeightedReturn: endpoint(series.equalWeighted),
     drift: latestDrift?.deltaExceedsThreshold === true,
-    openPositions: executors.filter((executor) => executor.state === "open").length,
+    openPositions: live.filter((executor) => executor.state === "open").length,
   };
+
+  const summary: FleetSummary =
+    scope === "current"
+      ? {
+          ...base,
+          scope: "current",
+          allocated: live.reduce(
+            (sum, executor) => sum + (executor.allocated ?? 0),
+            0,
+          ),
+        }
+      : { ...base, scope: "si" };
 
   return { executors, summary, series };
 }

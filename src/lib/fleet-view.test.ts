@@ -6,8 +6,10 @@ import {
   flattenParameters,
   readTimeframe,
   winRateOf,
+  type FleetView,
   type FleetViewInput,
 } from "./fleet-view";
+import type { LiveExecutor } from "./fleet";
 import type {
   CurrentExecutor,
   CurrentState,
@@ -160,6 +162,31 @@ function input(over: Partial<FleetViewInput> = {}): FleetViewInput {
   };
 }
 
+/**
+ * Narrowing helpers.
+ *
+ * `Executor` is a discriminated union and `FleetSummary` is discriminated on
+ * scope, so a live-only field is unreachable without narrowing first — which is
+ * the point of the types. These throw rather than using `assert.ok`, because an
+ * `asserts value` signature narrows the value passed to it, not a property
+ * access on a separate binding, so the assert form would not narrow `card`.
+ */
+function liveCard(view: FleetView, index = 0): LiveExecutor {
+  const card = view.executors[index];
+  if (card === undefined || card.kind !== "live") {
+    throw new Error(`executors[${index}] is not a live card`);
+  }
+  return card;
+}
+
+function currentSummary(view: FleetView) {
+  const summary = view.summary;
+  if (summary.scope !== "current") {
+    throw new Error(`expected a current-scope summary, got ${summary.scope}`);
+  }
+  return summary;
+}
+
 describe("a newly deployed executor", () => {
   test("still renders, with unknown figures as null rather than 0", () => {
     // In the manifest, no snapshot rows yet. The card must appear — it is
@@ -167,12 +194,12 @@ describe("a newly deployed executor", () => {
     const view = buildFleetView(input({ daily: [] }));
 
     assert.equal(view.executors.length, 1);
-    const card = view.executors[0]!;
+    const card = liveCard(view);
 
     assert.equal(card.cumulativePnl, null);
     assert.notEqual(card.cumulativePnl, 0);
     assert.equal(card.marks.length, 0);
-    assert.equal(card.signalNote, "no daily marks yet");
+    assert.equal(card.signalNote, "no daily history yet");
     assert.equal(card.tradesNote, "no closed trades yet");
   });
 
@@ -194,38 +221,93 @@ describe("a newly deployed executor", () => {
   });
 });
 
-describe("the signal note describes the days it actually plots", () => {
-  test("a fully flat history counts every mark as flat", () => {
-    const card = buildFleetView(
-      input({
-        daily: [
-          dailyRow({ date: "2026-09-11", cumulativePnl: -15.04 }),
-          dailyRow({ date: "2026-09-14", cumulativePnl: -11.119 }),
-        ],
-      }),
-    ).executors[0]!;
+describe("the signal note reports deployed, traded and held days", () => {
+  /**
+   * Three counts over ONE denominator: the executor's snapshot rows. The note
+   * describes the executor's history, not the dots beside it — the dot count is
+   * `marks`, which excludes rows with no cumulative P&L. Sharing a denominator is
+   * what makes "traded" and "held" impossible to read as fractions of different
+   * sets; an earlier version counted one over plotted days and the other over
+   * every row, so the two numbers described different things.
+   *
+   * "Deployed" is a count of snapshot rows, and the snapshot grain is one row per
+   * executor per market day — so a row is the platform recording a deployed
+   * executor on a trading day. Note it is a FLOOR, not a lifetime: platform
+   * snapshots begin 2026-07-20 while trades reach back to 2026-04-09, so an
+   * executor live before that date has days it was deployed with no row to prove
+   * it. Nothing in the data carries a deploy date — the manifest states what runs,
+   * never since when — so no more exact figure is available.
+   */
+  test("intraday reports deployed and traded, and omits held", () => {
+    // open_positions is captured at snapshot time, after the close. An intraday
+    // strategy is flat by the bell, so "held" would read 0 on every day it traded
+    // actively — a true number answering the wrong question. §6.2 already makes
+    // this slot vary by strategy character, so it is omitted rather than shown.
+    const card = liveCard(
+      buildFleetView(
+        input({
+          daily: [
+            dailyRow({ date: "2026-09-11", tradesOpened: 1, tradesClosed: 1 }),
+            dailyRow({ date: "2026-09-14" }),
+          ],
+        }),
+      ),
+    );
 
-    assert.equal(card.signalNote, "2 daily marks · 2 flat");
+    assert.equal(card.character, "intraday");
+    assert.equal(card.signalNote, "2 days deployed · 1 traded");
   });
 
-  test("flat counts only days that produced a mark", () => {
-    // A row with no cumulative P&L plots no dot, so it cannot be one of the flat
-    // days the note describes. Counting it over every row instead would report
-    // "2 daily marks · 2 flat" here — claiming both marks were flat when one of
-    // them closed a trade, and in the general case letting the flat count exceed
-    // the number of marks the reader can see.
-    const card = buildFleetView(
-      input({
-        daily: [
-          dailyRow({ date: "2026-09-11", cumulativePnl: -15.04, tradesClosed: 0 }),
-          dailyRow({ date: "2026-09-12", cumulativePnl: null, tradesClosed: 0 }),
-          dailyRow({ date: "2026-09-14", cumulativePnl: -11.119, tradesClosed: 1 }),
-        ],
-      }),
-    ).executors[0]!;
+  test("a multi-day strategy also reports the days it held a position", () => {
+    const card = liveCard(
+      buildFleetView(
+        input({
+          current: current({
+            executors: [
+              executor({ execution: { dataRequirements: { timeframe: "1D" } } }),
+            ],
+          }),
+          daily: [
+            dailyRow({ date: "2026-09-11", tradesOpened: 1, openPositions: 1 }),
+            dailyRow({ date: "2026-09-14", openPositions: 1 }),
+          ],
+        }),
+      ),
+    );
 
+    assert.equal(card.character, "continuous");
+    assert.equal(card.signalNote, "2 days deployed · 1 traded · 2 held");
+  });
+
+  test("a day that opened without closing still counts as traded", () => {
+    // The old note counted trades_closed only, so the entry day of a multi-day
+    // hold was reported as flat: money went to work and the row read as nothing
+    // happening.
+    const card = liveCard(
+      buildFleetView(
+        input({ daily: [dailyRow({ tradesOpened: 1, tradesClosed: 0 })] }),
+      ),
+    );
+
+    assert.equal(card.signalNote, "1 day deployed · 1 traded");
+  });
+
+  test("deployed counts every row, including days that plot no dot", () => {
+    const card = liveCard(
+      buildFleetView(
+        input({
+          daily: [
+            dailyRow({ date: "2026-09-11", cumulativePnl: -15.04 }),
+            dailyRow({ date: "2026-09-12", cumulativePnl: null }),
+            dailyRow({ date: "2026-09-14", cumulativePnl: -11.119, tradesClosed: 1 }),
+          ],
+        }),
+      ),
+    );
+
+    // Three days deployed, two of them plottable.
     assert.equal(card.marks.length, 2);
-    assert.equal(card.signalNote, "2 daily marks · 1 flat");
+    assert.equal(card.signalNote, "3 days deployed · 1 traded");
   });
 });
 
@@ -268,26 +350,26 @@ describe("deployed capital", () => {
       }),
     );
     assert.equal(view.executors[0]!.deployed, 189.6282);
-    assert.equal(view.executors[0]!.state, "open");
+    assert.equal(liveCard(view).state, "open");
     assert.equal(view.summary.openPositions, 1);
   });
 });
 
 describe("executor state", () => {
   test("flat is idle", () => {
-    assert.equal(buildFleetView(input()).executors[0]!.state, "idle");
+    assert.equal(liveCard(buildFleetView(input())).state, "idle");
   });
 
   test("a halted environment marks every card halted", () => {
     const view = buildFleetView(input({ current: current({ halt: "halted" }) }));
-    assert.equal(view.executors[0]!.state, "halted");
+    assert.equal(liveCard(view).state, "halted");
   });
 
   test("unknown halt does not silently become halted", () => {
     // 'unknown' is surfaced by HaltNotice as its own page state; the cards
     // themselves must not claim a halt we could not confirm.
     const view = buildFleetView(input({ current: current({ halt: "unknown" }) }));
-    assert.equal(view.executors[0]!.state, "idle");
+    assert.equal(liveCard(view).state, "idle");
   });
 });
 
@@ -412,7 +494,7 @@ describe("carried marks", () => {
 
     // Carried yesterday, live today — the strip answers "is what I am looking
     // at right now live", not "has anything ever been carried".
-    assert.equal(view.executors[0]!.carriedMark, false);
+    assert.equal(liveCard(view).carriedMark, false);
     assert.equal(view.summary.carried.count, 0);
   });
 
@@ -504,8 +586,8 @@ describe("identity and links", () => {
 describe("strategy character from the manifest", () => {
   test("intraday bar timeframes read as intraday", () => {
     assert.equal(readTimeframe({ dataRequirements: { timeframe: "15Min" } }), "15Min");
-    assert.equal(buildFleetView(input()).executors[0]!.character, "intraday");
-    assert.equal(buildFleetView(input()).executors[0]!.note, "intraday · 15Min bars");
+    assert.equal(liveCard(buildFleetView(input())).character, "intraday");
+    assert.equal(liveCard(buildFleetView(input())).note, "intraday · 15Min bars");
   });
 
   test("daily bars read as continuous", () => {
@@ -518,15 +600,15 @@ describe("strategy character from the manifest", () => {
         }),
       }),
     );
-    assert.equal(view.executors[0]!.character, "continuous");
+    assert.equal(liveCard(view).character, "continuous");
   });
 
   test("no declared timeframe makes no claim about flat days", () => {
     const view = buildFleetView(
       input({ current: current({ executors: [executor({ execution: {} })] }) }),
     );
-    assert.equal(view.executors[0]!.character, "continuous");
-    assert.equal(view.executors[0]!.note, "continuous");
+    assert.equal(liveCard(view).character, "continuous");
+    assert.equal(liveCard(view).note, "continuous");
     assert.equal(readTimeframe({}), null);
   });
 });
@@ -568,7 +650,7 @@ describe("summary totals", () => {
         }),
       }),
     );
-    assert.equal(view.summary.allocated, 600);
+    assert.equal(currentSummary(view).allocated, 600);
     assert.equal(view.summary.executorCount, 2);
   });
 
@@ -676,16 +758,41 @@ describe("summary totals", () => {
     assert.notEqual(view.summary.allTimePnl, null);
   });
 
-  test("asOf is the latest snapshot date", () => {
+  test("dataThrough is the latest snapshot date", () => {
     const view = buildFleetView(
       input({
         daily: [dailyRow({ date: "2026-09-11" }), dailyRow({ date: "2026-09-14" })],
       }),
     );
-    assert.equal(view.summary.asOf, "2026-09-14");
+    assert.equal(view.summary.dataThrough, "2026-09-14");
   });
 
-  test("asOf is null when there is no history", () => {
-    assert.equal(buildFleetView(input({ daily: [] })).summary.asOf, null);
+  test("dataThrough is null when there is no history", () => {
+    assert.equal(buildFleetView(input({ daily: [] })).summary.dataThrough, null);
+  });
+
+  test("reconciledAsOf is the last day that actually settled", () => {
+    // Today's row is always present and always null — its 16:00 close only becomes
+    // knowable as tomorrow's last_equity. Reporting the newest row's date would
+    // claim the books were checked today when they were not.
+    const view = buildFleetView(
+      input({
+        drift: [
+          driftRow({ date: "2026-09-15", unattributedDelta: 4.2 }),
+          driftRow({ date: "2026-09-16", unattributedDelta: null }),
+        ],
+      }),
+    );
+
+    assert.equal(view.summary.reconciledAsOf, "2026-09-15");
+  });
+
+  test("reconciledAsOf is null when nothing has reconciled, never a snapshot date", () => {
+    // It must not fall back to dataThrough: "how current is the data" and "when did the
+    // books last agree" are different questions with different answers.
+    const view = buildFleetView(input({ drift: [] }));
+
+    assert.equal(view.summary.reconciledAsOf, null);
+    assert.equal(view.summary.dataThrough, "2026-09-14");
   });
 });

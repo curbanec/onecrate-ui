@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 import { DEPLOYMENT_ENVS, type DeploymentEnv } from "@/lib/data";
+import { fleetHref, type FleetScope } from "@/lib/fleet";
 
 /**
  * PROD / DEV toggle (§5.1).
@@ -21,28 +22,33 @@ import { DEPLOYMENT_ENVS, type DeploymentEnv } from "@/lib/data";
  * would force client-side rendering up to the nearest boundary, which Next's own
  * docs recommend avoiding when the value can be passed down instead.
  *
- * Known limitation: toggling rebuilds the query string from scratch, so any
- * other search param on the route is dropped. Nothing sets one today. When
- * something does (a Trades filter, say), this needs the full current query
- * passed in rather than just the base path.
+ * The Fleet scope rides along. Switching PROD→DEV must not silently reset which
+ * population the page is showing, so both params are rebuilt together through
+ * `fleetHref` — the one place a Fleet query string is assembled. A third param
+ * means extending that function, not adding a second builder here.
  */
 export function EnvToggle({
   env,
+  scope,
   basePath,
   className,
 }: {
   /** Environment currently being viewed. */
   env: DeploymentEnv;
+  /** Population currently being viewed, carried across the switch. */
+  scope?: FleetScope;
   /** Route the toggle stays on, e.g. `/fleet`. */
   basePath: string;
   className?: string;
 }) {
-  const tone = (target: DeploymentEnv) => {
-    if (env !== target) return "bg-transparent text-muted";
-    return target === "prod"
-      ? "bg-accent text-white"
-      : "bg-accent-surface text-accent-ink";
-  };
+  /**
+   * Active is the solid accent in both directions — PROD and DEV look identical
+   * on purpose, matching the scope toggle below so the rail's controls read as
+   * one family. DEV used to carry the paler `accent-surface` to mark paper data;
+   * the label now carries that distinction on its own.
+   */
+  const tone = (target: DeploymentEnv) =>
+    env === target ? "bg-accent text-white" : "bg-transparent text-muted";
 
   return (
     <div
@@ -56,7 +62,7 @@ export function EnvToggle({
       {DEPLOYMENT_ENVS.map((target) => (
         <Link
           key={target}
-          href={`${basePath}?env=${target}`}
+          href={fleetHref(basePath, { env: target, scope })}
           aria-current={env === target ? "page" : undefined}
           className={cn(
             // text-center and no-underline are doing real work here: a button

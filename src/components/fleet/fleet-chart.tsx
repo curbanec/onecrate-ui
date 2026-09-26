@@ -209,10 +209,6 @@ export function FleetChart({ series }: { series: FleetSeries }) {
             />
           </LineChart>
         </ChartContainer>
-
-        <div className="text-label text-muted mt-1 text-center uppercase">
-          trading day
-        </div>
       </div>
     </div>
   );

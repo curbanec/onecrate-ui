@@ -66,6 +66,7 @@ export {
   isCarriedMark,
   assertDateOnly,
   assertDateRange,
+  assertTriples,
   dayStart,
   dayAfter,
   toDailyPerformanceRow,
