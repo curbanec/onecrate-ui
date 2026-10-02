@@ -5,10 +5,14 @@ export function HairlineCross({
   config,
   bleed = 16,
   cubeShiftX = 0,
+  cubeVariant,
+  cubeSpin,
 }: {
   config?: Partial<CrossConfig>;
   bleed?: number;
   cubeShiftX?: number;
+  cubeVariant?: "solid" | "grid";
+  cubeSpin?: boolean;
 }) {
   const g = crossGeometry(config);
 
@@ -34,6 +38,8 @@ export function HairlineCross({
           cubeWidth={g.cubeWidth}
           cubeHeight={g.cubeHeight}
           cubeShiftX={cubeShiftX}
+          variant={cubeVariant}
+          spin={cubeSpin}
         />
       </div>
 

@@ -16,7 +16,7 @@ export default function Page() {
       <div className="mx-auto flex w-full max-w-[720px] flex-1 flex-col">
         <header className="flex items-start justify-between">
           <div className="w-[188px]">
-            <HairlineCross bleed={0} />
+            <HairlineCross bleed={0} cubeVariant="grid" cubeSpin />
           </div>
           <Suspense fallback={<NavSessionFallback />}>
             <NavSession />
@@ -25,31 +25,30 @@ export default function Page() {
 
         <div className="mt-16 flex-1">
           <h1 className="text-heading text-ink">
-            One question per screen.
+            One flexible, intelligently designed, reconcilable machine.
           </h1>
           <p className="text-body text-muted mt-3 max-w-[52ch]">
-            OneCrate is the operator console for a fleet of algorithmic trading
-            executors. Every screen answers one thing: should this executor get
-            more capital, less, or none.
+            OneCrate.io is a polyglot algorithmic trading platform where stateless strategy services
+            receive market context and return trading decisions while maintaining complete
+            observability into their actions.
           </p>
 
           <div className="border-hair mt-10 border-t pt-6">
             <Label>What it does</Label>
             <ul className="text-body text-ink mt-3 flex flex-col gap-2">
               <li>
-                <span className="text-muted">evidence quality is visible</span> ·
-                a statistic drawn from six trades does not look as authoritative
-                as one drawn from two hundred
+                <span className="text-muted">layers on top of Alpaca</span> ·
+                connect your alpaca brokerage accounts to enable OneCrate's algorithmic trading capabilities
               </li>
               <li>
-                <span className="text-muted">sparse data is the steady state</span> ·
-                an intraday strategy is flat most days, and the display says so
-                rather than smoothing it away
+                <span className="text-muted">a growing variety of trading strategies</span> ·
+                One highly configurable 'Crate' is deployed which is set up to trade over a contract with
+                stateless strategy logic
               </li>
               <li>
-                <span className="text-muted">no invented content</span> ·
-                a figure with no source renders as an em dash, never as a
-                plausible-looking number
+                <span className="text-muted">complete observability and reconciliation</span> ·
+                every think loop in the platform is traceable and every balance, figure, and statistic
+                is accounted for and explainable
               </li>
             </ul>
           </div>
