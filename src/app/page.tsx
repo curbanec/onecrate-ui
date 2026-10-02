@@ -38,11 +38,11 @@ export default function Page() {
             <ul className="text-body text-ink mt-3 flex flex-col gap-2">
               <li>
                 <span className="text-muted">layers on top of Alpaca</span> ·
-                connect your alpaca brokerage accounts to enable OneCrate's algorithmic trading capabilities
+                connect your alpaca brokerage accounts to enable OneCrate’s algorithmic trading capabilities
               </li>
               <li>
                 <span className="text-muted">a growing variety of trading strategies</span> ·
-                One highly configurable 'Crate' is deployed which is set up to trade over a contract with
+                One highly configurable ‘Crate’ is deployed which is set up to trade over a contract with
                 stateless strategy logic
               </li>
               <li>
